@@ -1,0 +1,51 @@
+{
+  "_comment": "Recorded results, with provenance for every number. Rows marked source 'kaggle-notebook' were produced by patchcore-base.ipynb before the module refactor and are transcribed from the project log / surviving cell outputs, not re-run by this code. Rows produced by `python -m defectloc.evaluate` land in results/runs/*.json and are merged in by scripts/make_results_table.py.",
+  "dataset": "MVTec AD, category 'bottle' (209 train / 83 test images)",
+  "rows": [
+    {
+      "label": "PatchCore (baseline, Anomalib)",
+      "kind": "baseline",
+      "clean":    {"image_AUROC": 1.000, "pixel_AUROC": 0.986, "image_F1": 0.992, "pixel_F1": 0.727},
+      "lighting": {"image_AUROC": 0.947, "pixel_AUROC": 0.973, "pixel_F1": 0.598},
+      "source": "kaggle-notebook",
+      "provenance": "Anomalib PatchCore run; defect_detection_log.md sec. 'PatchCore baseline'. Reproduce with scripts/patchcore_baseline.py.",
+      "note": "Reference point, not part of this model. Included to size the gap."
+    },
+    {
+      "label": "Autoencoder v1 - large bottleneck (256x16x16)",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.737, "pixel_AUROC": 0.700},
+      "lighting": {"image_AUROC": 0.480, "pixel_AUROC": 0.529},
+      "source": "kaggle-notebook",
+      "provenance": "defect_detection_log.md sec. v1. Superseded; no checkpoint retained.",
+      "note": "Identity shortcut: the 65,536-value latent let the model copy its input through, so defects survived into the reconstruction."
+    },
+    {
+      "label": "Autoencoder v2 - tight bottleneck (64x8x8) + denoising",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.867, "pixel_AUROC": 0.741},
+      "lighting": {"image_AUROC": 0.560, "pixel_AUROC": 0.562},
+      "source": "kaggle-notebook",
+      "provenance": "defect_detection_log.md sec. v2. A later re-run of the same config (notebook cell 14) gave 0.874 / 0.743 clean and 0.511 / 0.556 lighting - see the run-to-run variance note in the README.",
+      "note": "Shortcut closed. image-AUROC >> pixel-AUROC: the model knew whether, not where."
+    },
+    {
+      "label": "Autoencoder v3 - local-SSIM anomaly map",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.937, "pixel_AUROC": 0.894},
+      "lighting": {"image_AUROC": 0.512, "pixel_AUROC": 0.715},
+      "source": "kaggle-notebook",
+      "provenance": "defect_detection_log.md sec. v3, confirmed by the surviving output of notebook cell 17 (0.9373 / 0.8942 clean, 0.5123 / 0.7150 lighting).",
+      "note": "+15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug this repo's scoring fix targets."
+    },
+    {
+      "label": "Autoencoder v3 + median/MAD image score",
+      "kind": "ours",
+      "clean":    {"image_AUROC": null, "pixel_AUROC": null},
+      "lighting": {"image_AUROC": null, "pixel_AUROC": null},
+      "source": "not-yet-run",
+      "provenance": "Implemented in defectloc/anomaly.py (normalize_map / image_score norm='median_mad') and unit-tested for lighting invariance, but not yet measured on MVTec AD - this machine has no copy of the dataset. Fill this row by running the two commands in README 'Reproducing the table'.",
+      "note": "Changes scoring only; no retraining. The v3 checkpoint is sufficient."
+    }
+  ]
+}

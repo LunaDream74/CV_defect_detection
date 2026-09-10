@@ -1,0 +1,4 @@
+# Optional extra: only needed to re-run the PatchCore reference row.
+# Heavy (pulls lightning + timm). Not required for the autoencoder.
+-r requirements.txt
+anomalib>=1.0
