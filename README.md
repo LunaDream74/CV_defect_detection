@@ -183,6 +183,26 @@ python scripts/make_results_table.py
 
 The second command regenerates `results/results.md`, merging the recorded history with every run JSON in `results/runs/`. Each run contributes two rows, one per scoring variant. To promote a measured number into the headline table above, copy it into `results/history.json` with its provenance.
 
+### Filling the table on Kaggle (no local dataset needed)
+
+Kaggle already hosts MVTec AD and gives you a GPU, so the run can happen there and only a
+small JSON comes back. `scripts/make_kaggle_kernel.py` generates a self-contained notebook
+with the contents of `defectloc/` embedded, so the Kaggle run uses exactly this code.
+
+```bash
+pip install kaggle
+python scripts/make_kaggle_kernel.py --username <your-kaggle-username>
+kaggle kernels push -p kaggle_kernel
+kaggle kernels status <your-kaggle-username>/bottle-defect-mad-score
+kaggle kernels output <your-kaggle-username>/bottle-defect-mad-score -p results/runs/
+python scripts/make_results_table.py
+```
+
+Needs a Kaggle API token at `~/.kaggle/kaggle.json` (Kaggle > Settings > Create New Token).
+The kernel is created private, GPU on, internet on (one `pip install`), with `ipythonx/mvtec-ad`
+attached. Regenerate the kernel after any change to `defectloc/`, or the Kaggle run and this
+repo drift apart.
+
 ### Tests
 
 ```bash

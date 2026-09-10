@@ -1,0 +1,15 @@
+{
+  "id": "YOUR_KAGGLE_USERNAME/bottle-defect-mad-score",
+  "title": "Bottle defect localisation - median/MAD score",
+  "code_file": "bottle-defect-mad-score.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "ipythonx/mvtec-ad"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}
