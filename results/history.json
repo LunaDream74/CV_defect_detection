@@ -1,6 +1,7 @@
 {
-  "_comment": "Recorded results, with provenance for every number. Rows marked source 'kaggle-notebook' were produced by patchcore-base.ipynb before the module refactor and are transcribed from the project log / surviving cell outputs, not re-run by this code. Rows produced by `python -m defectloc.evaluate` land in results/runs/*.json and are merged in by scripts/make_results_table.py.",
-  "dataset": "MVTec AD, category 'bottle' (209 train / 83 test images)",
+  "_comment": "Recorded results, with provenance for every number. Rows marked source 'kaggle-notebook' were produced by patchcore-base.ipynb before the module refactor and are transcribed from the project log / surviving cell outputs. Rows marked 'kaggle-run-v2' were measured by this code on Kaggle (results/runs/ae_v3_kaggle.json, log at results/runs/kaggle_v2.log). Runs named in promoted_runs are curated into rows below and are not re-emitted automatically by scripts/make_results_table.py.",
+  "dataset": "MVTec AD, category 'bottle' (209 train / 83 test images, 63 defective)",
+  "promoted_runs": ["ae_v3_kaggle.json"],
   "rows": [
     {
       "label": "PatchCore (baseline, Anomalib)",
@@ -36,16 +37,25 @@
       "lighting": {"image_AUROC": 0.512, "pixel_AUROC": 0.715},
       "source": "kaggle-notebook",
       "provenance": "defect_detection_log.md sec. v3, confirmed by the surviving output of notebook cell 17 (0.9373 / 0.8942 clean, 0.5123 / 0.7150 lighting).",
-      "note": "+15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug this repo's scoring fix targets."
+      "note": "+15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug Fix 2b tried to close."
     },
     {
-      "label": "Autoencoder v3 + median/MAD image score",
+      "label": "Autoencoder v3 - re-run after the module refactor",
       "kind": "ours",
-      "clean":    {"image_AUROC": null, "pixel_AUROC": null},
-      "lighting": {"image_AUROC": null, "pixel_AUROC": null},
-      "source": "not-yet-run",
-      "provenance": "Implemented in defectloc/anomaly.py (normalize_map / image_score norm='median_mad') and unit-tested for lighting invariance, but not yet measured on MVTec AD - this machine has no copy of the dataset. Fill this row by running the two commands in README 'Reproducing the table'.",
-      "note": "Changes scoring only; no retraining. The v3 checkpoint is sufficient."
+      "clean":    {"image_AUROC": 0.9365, "pixel_AUROC": 0.9081},
+      "lighting": {"image_AUROC": 0.5508, "pixel_AUROC": 0.7197},
+      "source": "kaggle-run-v2",
+      "provenance": "results/runs/ae_v3_kaggle.json. Fresh 80-epoch training run, seed 0, on Kaggle (CPU: the assigned Tesla P100 is sm_60 and the preinstalled torch supports sm_70+, so the device probe fell back). 1931 s, final loss 0.0643.",
+      "note": "Reproduces the notebook within run-to-run spread (0.937/0.894 -> 0.937/0.908 clean; 0.512/0.715 -> 0.551/0.720 lighting), which is the evidence that the refactor preserved the numerics."
+    },
+    {
+      "label": "Autoencoder v3 + median/MAD image score (REJECTED)",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.6421, "pixel_AUROC": 0.8846},
+      "lighting": {"image_AUROC": 0.4508, "pixel_AUROC": 0.7278},
+      "source": "kaggle-run-v2",
+      "provenance": "results/runs/ae_v3_kaggle.json, same checkpoint and same anomaly maps as the row above, scored differently in the same pass.",
+      "note": "Fix 2b failed. Image-AUROC fell in BOTH conditions: clean 0.937 -> 0.642, lighting 0.551 -> 0.451 (below chance). Dividing by each image's own MAD removes a signal that was real, because an image that reconstructs badly overall is genuinely more likely to be defective, and MAD itself rises with the defect. See README 'Fix 2b: what happened'."
     }
   ]
 }

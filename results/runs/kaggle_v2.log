@@ -1,0 +1,106 @@
+[{"stream_name":"stderr","time":6.477743218,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.477803621,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.477809467,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.477818819,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":7.042811724,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.04284836,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.042852353,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.0428548,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":16.588179877,"data":"torch 2.10.0+cu128 | cuda True\n"}
+,{"stream_name":"stdout","time":16.588261182,"data":"device: Tesla P100-PCIE-16GB\n"}
+,{"stream_name":"stderr","time":16.589283463,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589307463,"data":"    Found GPU0 Tesla P100-PCIE-16GB which is of cuda capability 6.0.\n"}
+,{"stream_name":"stderr","time":16.589312461,"data":"    Minimum and Maximum cuda capability supported by this version of PyTorch is\n"}
+,{"stream_name":"stderr","time":16.589316797,"data":"    (7.0) - (12.0)\n"}
+,{"stream_name":"stderr","time":16.589320739,"data":"    \n"}
+,{"stream_name":"stderr","time":16.589324256,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":16.589327654999998,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589331131,"data":"    Please install PyTorch with a following CUDA\n"}
+,{"stream_name":"stderr","time":16.589334587,"data":"    configurations:  12.6 following instructions at\n"}
+,{"stream_name":"stderr","time":16.589338001,"data":"    https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":16.589341767,"data":"    \n"}
+,{"stream_name":"stderr","time":16.589345001,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":16.589348342,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589351906,"data":"Tesla P100-PCIE-16GB with CUDA capability sm_60 is not compatible with the current PyTorch installation.\n"}
+,{"stream_name":"stderr","time":16.58935553,"data":"The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 sm_90 sm_100 sm_120.\n"}
+,{"stream_name":"stderr","time":16.589359125,"data":"If you want to use the Tesla P100-PCIE-16GB GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":16.58936274,"data":"\n"}
+,{"stream_name":"stderr","time":16.589365922,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":16.589369177000002,"data":"\n"}
+,{"stream_name":"stderr","time":16.58937228,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589375681,"data":"    Found GPU0 Tesla P100-PCIE-16GB which is of cuda capability 6.0.\n"}
+,{"stream_name":"stderr","time":16.589380739,"data":"    Minimum and Maximum cuda capability supported by this version of PyTorch is\n"}
+,{"stream_name":"stderr","time":16.589398974,"data":"    (7.0) - (12.0)\n"}
+,{"stream_name":"stderr","time":16.589401609,"data":"    \n"}
+,{"stream_name":"stderr","time":16.589403734,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":16.589405841,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589408112,"data":"    Please install PyTorch with a following CUDA\n"}
+,{"stream_name":"stderr","time":16.5894103,"data":"    configurations:  12.6 following instructions at\n"}
+,{"stream_name":"stderr","time":16.58941251,"data":"    https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":16.589414719,"data":"    \n"}
+,{"stream_name":"stderr","time":16.589416817,"data":"  queued_call()\n"}
+,{"stream_name":"stderr","time":16.589418932,"data":"/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:435: UserWarning: \n"}
+,{"stream_name":"stderr","time":16.589421161,"data":"Tesla P100-PCIE-16GB with CUDA capability sm_60 is not compatible with the current PyTorch installation.\n"}
+,{"stream_name":"stderr","time":16.589423554,"data":"The current PyTorch install supports CUDA capabilities sm_70 sm_75 sm_80 sm_86 sm_90 sm_100 sm_120.\n"}
+,{"stream_name":"stderr","time":16.589425872,"data":"If you want to use the Tesla P100-PCIE-16GB GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/\n"}
+,{"stream_name":"stderr","time":16.589428212,"data":"\n"}
+,{"stream_name":"stderr","time":16.589430294,"data":"  queued_call()\n"}
+,{"stream_name":"stdout","time":16.620077617,"data":"wrote 10 modules\n"}
+,{"stream_name":"stdout","time":26.104368893,"data":"category dir: /kaggle/input/datasets/ipythonx/mvtec-ad/bottle\n"}
+,{"stream_name":"stdout","time":26.104412572,"data":"contains:  ['ground_truth', 'test', 'train']\n"}
+,{"stream_name":"stdout","time":26.104416692,"data":"siblings:   ['bottle', 'cable', 'capsule', 'carpet', 'grid', 'hazelnut', 'leather', 'metal_nut', 'pill', 'screw', 'tile', 'toothbrush', 'transistor', 'wood', 'zipper']\n"}
+,{"stream_name":"stdout","time":33.444307023,"data":"clean: /kaggle/working/data/MVTecAD/bottle | train imgs: 209\n"}
+,{"stream_name":"stdout","time":40.184428662,"data":"lighting: /kaggle/working/data/MVTecAD_lighting/bottle (83 test images stressed, seed=0)\n"}
+,{"stream_name":"stderr","time":40.626386696,"data":"/kaggle/working/defectloc/train.py:71: RuntimeWarning: CUDA reports available but is not usable on Tesla P100-PCIE-16GB (AcceleratorError: CUDA error: no kernel image is available for execution on the device\n"}
+,{"stream_name":"stderr","time":40.626420726,"data":"Search for `cudaErrorNoKernelImageForDevice' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\n"}
+,{"stream_name":"stderr","time":40.626427858,"data":"CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.\n"}
+,{"stream_name":"stderr","time":40.626433552,"data":"For debugging consider passing CUDA_LAUNCH_BLOCKING=1\n"}
+,{"stream_name":"stderr","time":40.626438747,"data":"Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.\n"}
+,{"stream_name":"stderr","time":40.626443622,"data":"). Falling back to CPU. Training will be much slower; pass --device cuda to override and see the real error.\n"}
+,{"stream_name":"stderr","time":40.626448402,"data":"  return torch.device(\"cuda\" if cuda_is_usable() else \"cpu\")\n"}
+,{"stream_name":"stderr","time":40.626453434,"data":"\n"}
+,{"stream_name":"stderr","time":40.626458275,"data":"/kaggle/working/defectloc/train.py:71: RuntimeWarning: CUDA reports available but is not usable on Tesla P100-PCIE-16GB (AcceleratorError: CUDA error: no kernel image is available for execution on the device\n"}
+,{"stream_name":"stderr","time":40.626477784,"data":"Search for `cudaErrorNoKernelImageForDevice' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\n"}
+,{"stream_name":"stderr","time":40.626481645,"data":"CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.\n"}
+,{"stream_name":"stderr","time":40.62648534,"data":"For debugging consider passing CUDA_LAUNCH_BLOCKING=1\n"}
+,{"stream_name":"stderr","time":40.626488897,"data":"Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.\n"}
+,{"stream_name":"stderr","time":40.626492497,"data":"). Falling back to CPU. Training will be much slower; pass --device cuda to override and see the real error.\n"}
+,{"stream_name":"stderr","time":40.62649617,"data":"  return torch.device(\"cuda\" if cuda_is_usable() else \"cpu\")\n"}
+,{"stream_name":"stdout","time":40.627219599,"data":"training on: cpu\n"}
+,{"stream_name":"stdout","time":40.627246595,"data":"WARNING: running on CPU. Expect roughly an hour rather than minutes.\n"}
+,{"stream_name":"stdout","time":69.330160433,"data":"epoch   1/80  loss 0.4509\n"}
+,{"stream_name":"stdout","time":294.297141251,"data":"epoch  10/80  loss 0.2714\n"}
+,{"stream_name":"stdout","time":539.263096577,"data":"epoch  20/80  loss 0.1114\n"}
+,{"stream_name":"stdout","time":770.703024386,"data":"epoch  30/80  loss 0.0918\n"}
+,{"stream_name":"stdout","time":1009.416150938,"data":"epoch  40/80  loss 0.0793\n"}
+,{"stream_name":"stdout","time":1244.63457238,"data":"epoch  50/80  loss 0.0736\n"}
+,{"stream_name":"stdout","time":1475.791014502,"data":"epoch  60/80  loss 0.0700\n"}
+,{"stream_name":"stdout","time":1723.859481913,"data":"epoch  70/80  loss 0.0671\n"}
+,{"stream_name":"stdout","time":1971.338253519,"data":"epoch  80/80  loss 0.0643\n"}
+,{"stream_name":"stdout","time":1971.364640952,"data":"trained in 1930.9s -\u003e /kaggle/working/checkpoints/ae_v3.pt\n"}
+,{"stream_name":"stdout","time":1973.17963583,"data":"wrote /kaggle/working/results/figures/v3_clean.png\n"}
+,{"stream_name":"stdout","time":1974.513553278,"data":"wrote /kaggle/working/results/figures/v3_lighting.png\n"}
+,{"stream_name":"stdout","time":1987.719059627,"data":"clean     [none      ]  image-AUROC 0.9365   pixel-AUROC 0.9081\n"}
+,{"stream_name":"stdout","time":1987.71910801,"data":"clean     [median_mad]  image-AUROC 0.6421   pixel-AUROC 0.8846\n"}
+,{"stream_name":"stdout","time":1998.828650059,"data":"lighting  [none      ]  image-AUROC 0.5508   pixel-AUROC 0.7197\n"}
+,{"stream_name":"stdout","time":1998.828688261,"data":"lighting  [median_mad]  image-AUROC 0.4508   pixel-AUROC 0.7278\n"}
+,{"stream_name":"stdout","time":1998.828694926,"data":"\n"}
+,{"stream_name":"stdout","time":1998.8287002,"data":"wrote /kaggle/working/results/runs/ae_v3_kaggle.json\n"}
+,{"stream_name":"stdout","time":1998.986557316,"data":"lighting image-AUROC: raw 0.551 -\u003e median/MAD 0.451 (-0.100)\n"}
+,{"stream_name":"stdout","time":1998.986590281,"data":"clean    image-AUROC: raw 0.937 -\u003e median/MAD 0.642 (-0.294)\n"}
+,{"stream_name":"stdout","time":1998.986594615,"data":"\n"}
+,{"stream_name":"stdout","time":1998.986598171,"data":"chance is 0.500. The fix is only a win if lighting image-AUROC rises well\n"}
+,{"stream_name":"stdout","time":1998.986601547,"data":"clear of chance WITHOUT costing much on clean. A clean drop is a real cost,\n"}
+,{"stream_name":"stdout","time":1998.986604813,"data":"not a rounding detail: report it either way.\n"}
+,{"stream_name":"stderr","time":2004.828690769,"data":"/usr/local/lib/python3.12/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2004.828736089,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2004.99219737,"data":"/usr/local/lib/python3.12/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2004.992223357,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2005.58814216,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":2005.957955383,"data":"[NbConvertApp] Writing 4249983 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":2008.318771844,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2009.266159042,"data":"[NbConvertApp] Support files will be in __results___files/\n"}
+,{"stream_name":"stderr","time":2009.266209597,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":2009.267383281,"data":"[NbConvertApp] Making directory __results___files\n"}
+,{"stream_name":"stderr","time":2009.268847309,"data":"[NbConvertApp] Writing 357112 bytes to __results__.html\n"}
+]

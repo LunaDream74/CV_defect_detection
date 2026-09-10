@@ -1,6 +1,6 @@
 # Results
 
-**Dataset:** MVTec AD, category 'bottle' (209 train / 83 test images)
+**Dataset:** MVTec AD, category 'bottle' (209 train / 83 test images, 63 defective)
 
 A photometric "factory-lighting" stress test (brightness / contrast / gamma / colour drift plus a directional shadow gradient) is applied to the **test set only**; training stays clean. It measures what happens when a model trained under one lighting rig meets another.
 
@@ -12,7 +12,8 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 | Autoencoder v1 - large bottleneck (256x16x16) | 0.737 | 0.700 | 0.480 | 0.529 | kaggle-notebook |
 | Autoencoder v2 - tight bottleneck (64x8x8) + denoising | 0.867 | 0.741 | 0.560 | 0.562 | kaggle-notebook |
 | Autoencoder v3 - local-SSIM anomaly map | 0.937 | **0.894** | 0.512 | 0.715 | kaggle-notebook |
-| Autoencoder v3 + median/MAD image score | -- | -- | -- | -- | not-yet-run |
+| Autoencoder v3 - re-run after the module refactor | 0.936 | **0.908** | 0.551 | 0.720 | kaggle-run-v2 |
+| Autoencoder v3 + median/MAD image score (REJECTED) | 0.642 | 0.885 | 0.451 | 0.728 | kaggle-run-v2 |
 
 ## Provenance
 
@@ -23,9 +24,11 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 - **Autoencoder v2 - tight bottleneck (64x8x8) + denoising** — defect_detection_log.md sec. v2. A later re-run of the same config (notebook cell 14) gave 0.874 / 0.743 clean and 0.511 / 0.556 lighting - see the run-to-run variance note in the README.
   - Shortcut closed. image-AUROC >> pixel-AUROC: the model knew whether, not where.
 - **Autoencoder v3 - local-SSIM anomaly map** — defect_detection_log.md sec. v3, confirmed by the surviving output of notebook cell 17 (0.9373 / 0.8942 clean, 0.5123 / 0.7150 lighting).
-  - +15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug this repo's scoring fix targets.
-- **Autoencoder v3 + median/MAD image score** — Implemented in defectloc/anomaly.py (normalize_map / image_score norm='median_mad') and unit-tested for lighting invariance, but not yet measured on MVTec AD - this machine has no copy of the dataset. Fill this row by running the two commands in README 'Reproducing the table'.
-  - Changes scoring only; no retraining. The v3 checkpoint is sufficient.
+  - +15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug Fix 2b tried to close.
+- **Autoencoder v3 - re-run after the module refactor** — results/runs/ae_v3_kaggle.json. Fresh 80-epoch training run, seed 0, on Kaggle (CPU: the assigned Tesla P100 is sm_60 and the preinstalled torch supports sm_70+, so the device probe fell back). 1931 s, final loss 0.0643.
+  - Reproduces the notebook within run-to-run spread (0.937/0.894 -> 0.937/0.908 clean; 0.512/0.715 -> 0.551/0.720 lighting), which is the evidence that the refactor preserved the numerics.
+- **Autoencoder v3 + median/MAD image score (REJECTED)** — results/runs/ae_v3_kaggle.json, same checkpoint and same anomaly maps as the row above, scored differently in the same pass.
+  - Fix 2b failed. Image-AUROC fell in BOTH conditions: clean 0.937 -> 0.642, lighting 0.551 -> 0.451 (below chance). Dividing by each image's own MAD removes a signal that was real, because an image that reconstructs badly overall is genuinely more likely to be defective, and MAD itself rises with the defect. See README 'Fix 2b: what happened'.
 
 ## How to read the two conditions
 

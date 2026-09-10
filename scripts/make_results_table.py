@@ -20,10 +20,19 @@ def fmt(v) -> str:
     return "--" if v is None else f"{v:.3f}"
 
 
-def load_runs(runs_dir: Path) -> list[dict]:
-    """Turn each evaluation run JSON into one table row per scoring variant."""
+def load_runs(runs_dir: Path, promoted: set[str] | None = None) -> list[dict]:
+    """Turn each evaluation run JSON into one table row per scoring variant.
+
+    Runs listed in history's ``promoted_runs`` are skipped: their numbers have
+    already been written into the curated rows with an interpretation attached,
+    and emitting them twice would put the same measurement in the table under
+    two labels.
+    """
+    promoted = promoted or set()
     rows = []
     for f in sorted(runs_dir.glob("*.json")):
+        if f.name in promoted:
+            continue
         run = json.loads(f.read_text(encoding="utf-8"))
         for variant, vlabel in (("none", "raw top-k score"), ("median_mad", "median/MAD score")):
             row = {
@@ -97,7 +106,8 @@ def main(argv=None) -> int:
 
     history = json.loads(Path(a.history).read_text(encoding="utf-8"))
     runs_dir = Path(a.runs_dir)
-    runs = load_runs(runs_dir) if runs_dir.is_dir() else []
+    promoted = set(history.get("promoted_runs", []))
+    runs = load_runs(runs_dir, promoted) if runs_dir.is_dir() else []
 
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)
     Path(a.out).write_text(render(history, runs), encoding="utf-8")

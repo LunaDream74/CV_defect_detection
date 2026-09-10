@@ -15,16 +15,17 @@ Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" str
 | PatchCore (baseline, via Anomalib) | 1.000 | 0.986 | 0.947 | 0.973 |
 | Autoencoder v1 (large bottleneck) | 0.737 | 0.700 | 0.480 | 0.529 |
 | Autoencoder v2 (tight bottleneck + denoising) | 0.867 | 0.741 | 0.560 | 0.562 |
-| **Autoencoder v3 (this repo)** | 0.937 | **0.894** | 0.512 | 0.715 |
-| Autoencoder v3 + median/MAD score | — | — | — | — |
+| Autoencoder v3 (original notebook run) | 0.937 | 0.894 | 0.512 | 0.715 |
+| **Autoencoder v3 (re-run after refactor)** | 0.936 | **0.908** | 0.551 | 0.720 |
+| Autoencoder v3 + median/MAD score (rejected) | 0.642 | 0.885 | 0.451 | 0.728 |
 
-The autoencoder reaches a clean pixel-AUROC of **0.894** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
+The autoencoder reaches a clean pixel-AUROC of **0.908** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
 
-Every number above and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`. The v1–v3 rows come from the Kaggle runs recorded in [`defect_detection_log.md`](defect_detection_log.md); they have not been re-measured since the refactor, and are labelled as such in the table.
+The re-run reproduces the notebook within run-to-run spread (clean 0.937/0.894 → 0.936/0.908, lighting 0.512/0.715 → 0.551/0.720). That agreement is the evidence that the refactor preserved the numerics, and it is why the two v3 rows are both kept rather than one overwriting the other.
 
-**The last row is empty on purpose.** The median/MAD score fix is implemented and unit-tested (see below), but it has not been run against MVTec AD, because the machine this refactor was done on has no copy of the dataset. An unmeasured row shows as `—` rather than being filled with a plausible guess. [Reproducing the table](#reproducing-the-table) is two commands once the data is present.
+Every number and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`.
 
-> **Known open issue (v3):** under the lighting stress test, *pixel*-AUROC stays healthy (0.715) but *image*-AUROC collapses to ~random (0.512). This is a score-normalization problem, not a representation flaw — a global lighting shift moves each image's overall error baseline by different amounts, so per-image scores stop being comparable across lighting conditions.
+> **The lighting failure is not fixed.** Under the stress test, *pixel*-AUROC stays healthy (0.720) but *image*-AUROC sits near chance (0.551). The diagnosis was that this is a scoring problem rather than a representation flaw. That diagnosis still looks right, and the first fix built on it made things worse in both conditions. See [Fix 2b: what happened](#fix-2b-what-happened).
 
 ---
 
@@ -62,22 +63,47 @@ See [`defect_detection_log.md`](defect_detection_log.md) for the full project lo
 
 ---
 
-## The scoring fix (Fix 2b)
+## Fix 2b: what happened
 
-The lighting failure separates cleanly into two questions the code had been answering with one number:
+The lighting failure separates into two questions the code had been answering with one number:
 
-- the **map** says *where* the image is anomalous, and it survived the stress test (pixel-AUROC 0.715);
-- the **score** reduces that map to one number saying *whether* the image is defective, and it did not (image-AUROC 0.512).
+- the **map** says *where* the image is anomalous, and it survived the stress test (pixel-AUROC 0.720);
+- the **score** reduces that map to one number saying *whether* the image is defective, and it did not (image-AUROC 0.551).
 
-A dim frame reconstructs worse everywhere, so *every* pixel of its anomaly map sits higher. The raw top-1% score therefore measures the lighting as much as the defect, and images shot under different lighting stop being comparable to each other.
+The hypothesis was that a dim frame reconstructs worse everywhere, so every pixel of its anomaly map sits higher, and the raw top-1% score therefore measures the lighting as much as the defect. Predicted direction: dividing each image's own baseline out should recover lighting image-AUROC at little cost on clean.
 
-`normalize_map` in [`defectloc/anomaly.py`](defectloc/anomaly.py) divides that baseline out: `(amap − median) / MAD`, per image. Median and MAD describe that image's own normal background, and because the defect covers a few percent of the pixels, it barely moves either. Mean and standard deviation would not work here for exactly that reason — the defect is an outlier, so it would inflate the very quantity it is being measured against.
+`normalize_map` in [`defectloc/anomaly.py`](defectloc/anomaly.py) implements that as `(amap − median) / MAD`, per image.
 
-The normalization is monotonic within an image, so it cannot change *which* pixels are hottest, only the units the score is reported in. That is the whole point: it makes scores comparable **across** images.
+**It failed, in both conditions.**
 
-Two tests in [`tests/test_smoke.py`](tests/test_smoke.py) pin this down. Under a simulated affine lighting shift the normalized score is exactly invariant while the raw score moves by more than half, and a lighting-shifted *good* map outranks a clean *defective* one under raw scoring but not under normalized scoring. That is the failure mechanism reproduced in an assertion.
+| | Clean image-AUROC | Lighting image-AUROC |
+|---|:---:|:---:|
+| raw top-1% | 0.936 | 0.551 |
+| median/MAD | 0.642 | **0.451** |
 
-What those tests do **not** show is how much image-AUROC comes back on real bottles. Only a run on MVTec AD answers that.
+Lighting did not recover; it fell below chance, which means the ranking is now actively inverted. Clean lost 0.29 outright. Both variants were scored in the same pass over identical anomaly maps from one checkpoint, so nothing about training or the map explains the difference.
+
+Two mistakes in the reasoning, and the second is the interesting one.
+
+**The baseline was not pure nuisance.** An image whose reconstruction is bad overall is genuinely more likely to be defective, so the very quantity being divided out carried real signal. That alone explains the clean-condition collapse, where lighting was never a confound to begin with.
+
+**MAD is not defect-invariant.** The argument for median and MAD was that a defect covering a few percent of the pixels barely moves either. The anomaly maps in [`results/figures/v3_clean.png`](results/figures/v3_clean.png) show that is wrong: the map fires across the whole rim annulus, not just the defect, so a defective image has a visibly wider spread of map values. Its MAD is therefore *larger*, and dividing by it shrinks exactly the scores that should be highest. The normalization penalizes defective images, which is why the lighting number lands below 0.5 rather than merely failing to improve.
+
+Pixel-AUROC barely moved (clean 0.908 → 0.885, lighting 0.720 → 0.728), confirming this is purely a scoring effect and the map is untouched.
+
+### What the tests did and did not establish
+
+Two tests in [`tests/test_smoke.py`](tests/test_smoke.py) still pass, and they were never wrong. Under a simulated affine shift of the anomaly map, the normalized score is exactly invariant while the raw score moves by more than half.
+
+The error was in what that licensed. Invariance to a transformation is not the same property as discriminating defects, and real lighting is not a pure affine shift of the anomaly map. A unit test that pins a mechanism can be entirely correct and still say nothing about whether the mechanism helps. The tests are kept, with their scope stated, because the invariance claim remains true and worth protecting.
+
+### Where to go next
+
+Ordered by how much of the above they address, and stated as hypotheses rather than plans:
+
+1. **Calibrate against normal images, not against the image itself.** Estimate the score distribution on held-out *good* images under the same condition and standardize against that. The divisor then cannot be inflated by the defect it is meant to measure, which is the failure above.
+2. **Normalize with an input-side statistic** such as the frame's mean brightness, rather than a statistic of the error map. Same reasoning: keep the defect out of the denominator.
+3. **Tighten the map first.** The rim over-firing visible in the figures is what makes MAD defect-sensitive. A map that fired only on defects would make every scoring rule easier, and it is the more fundamental problem.
 
 ---
 
@@ -96,7 +122,7 @@ Output 3×256×256 (reconstruction)
 - **Loss:** `0.5·MSE + 0.5·(1 − SSIM)` — the SSIM term tolerates the blur a tight bottleneck produces while still penalizing structural defects.
 - **Training objective:** denoising — input is corrupted with Gaussian noise (σ=0.1), target is the clean image.
 - **Anomaly map:** per-pixel local-SSIM dissimilarity (window 11), computed on the grayscale-averaged channels.
-- **Image score:** mean of the top-1% hottest pixels (more robust than pure max), optionally median/MAD-normalized.
+- **Image score:** mean of the top-1% hottest pixels (more robust than pure max). A median/MAD-normalized variant exists and is reported alongside, but it scored worse and is not the default.
 
 ---
 
@@ -228,6 +254,7 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 - **Everything is seeded**, including the lighting stress set. In the notebook it was not, which is why the v2 row in the log (0.867 / 0.741 clean) and a later re-run of the same configuration (0.874 / 0.743) disagree slightly. Run-to-run spread of roughly a point on this dataset is normal, and is worth remembering before reading any single-point comparison too closely.
 - **The config is stored inside each checkpoint**, so `evaluate` and `visualize` rebuild the exact model that was trained without repeating any flags.
 - **Small test set.** MVTec `bottle` has 83 test images, 20 of them good. AUROC on that few images moves noticeably from a couple of rank swaps, so the differences between neighbouring rows are indicative rather than significant.
+- **The measured rows ran on CPU, not GPU.** Kaggle assigned a Tesla P100 (compute capability sm_60) alongside a torch build supporting sm_70 and up. `torch.cuda.is_available()` returns `True` in that situation and the incompatibility only surfaces once a real op runs, so `pick_device` probes the GPU with an actual convolution and falls back to CPU. The run took 1931 s instead of a few minutes. Device choice affects runtime, not results.
 - The notebook's hardcoded `DATA_ROOT`, its duplicate cells, and its unseeded augmentation loop are all resolved by `scripts/prepare_data.py`. The Anomalib `RecursionError` workaround (`Engine(enable_progress_bar=False)`) is applied in `scripts/patchcore_baseline.py`.
 
 ---
@@ -235,7 +262,8 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 ## Roadmap
 
 - [x] **Refactor** the notebook into Python modules.
-- [~] **Fix 2b — per-image score normalization** (subtract median / divide by MAD before the top-k image score) to recover lighting image-AUROC. Implemented and unit-tested; not yet measured on MVTec AD.
+- [x] **Fix 2b — per-image median/MAD score normalization.** Measured and **rejected**: image-AUROC fell in both conditions (clean 0.936 → 0.642, lighting 0.551 → 0.451). Kept in the code as an option, and in the table as a recorded negative result. See [Fix 2b: what happened](#fix-2b-what-happened).
+- [ ] **Fix 2c — calibrate the image score against held-out normal images** instead of against the image's own pixels, so the defect cannot inflate its own divisor.
 - [ ] **Masking-based denoising** — replace additive noise with random patch masking/inpainting to erase defects more completely and reduce false-firing.
 - [ ] **Synthetic defects (DRAEM-style)** — paste defect-shaped corruptions on normal images for self-supervised, mask-supervised training; expected to push past ~0.95 and improve pixel-F1.
 - [ ] **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start matching memory-bank methods like PatchCore.
@@ -250,4 +278,4 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 - Reconstruction-based detection is strongest on **textural/appearance** defects (chips, contamination, scratches) and weaker on **logical** defects (wrong label entirely, right part in wrong place), which may need a complementary method.
 - Results are on MVTec AD, which is well-aligned and well-lit; real-line performance depends on capture conditions.
 - The lighting stress test is **photometric only**. It does not cover blur, defocus, misalignment, or camera pose change, and it is synthetic rather than a second real capture session. It is a lower bound on the difficulty of a real lighting change.
-- Every autoencoder row in the results table comes from one training run at one seed. There are no error bars.
+- Every autoencoder row comes from one training run at one seed. There are no error bars. The two v3 rows are the only repeat measurement available, and they differ by up to 0.04 on lighting image-AUROC, which is the best available estimate of the noise floor.

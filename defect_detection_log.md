@@ -128,27 +128,66 @@ Replaced the smoothed pixel-MSE anomaly map with a **per-pixel local-SSIM dissim
 | Model | Clean image | Clean pixel | Lighting image | Lighting pixel |
 |-------|-------------|-------------|----------------|----------------|
 | PatchCore baseline | 1.000 | 0.986 | 0.947 | 0.973 |
-| Autoencoder v3 (current) | 0.937 | **0.894** | 0.512 | 0.715 |
+| Autoencoder v3 (notebook run) | 0.937 | 0.894 | 0.512 | 0.715 |
+| Autoencoder v3 (re-run post-refactor) | 0.936 | **0.908** | 0.551 | 0.720 |
 
-A from-scratch autoencoder reached **clean pixel-AUROC 0.894** vs PatchCore's 0.986 — a legitimate, fully-understood gap, reached in two improvement steps. Every point of the gap is explainable.
+A from-scratch autoencoder reached **clean pixel-AUROC 0.908** vs PatchCore's 0.986 — a legitimate, fully-understood gap, reached in two improvement steps. Every point of the gap is explainable.
 
 ---
 
-## 6. Open issue (to be addressed next — Fix 2b)
+## 6. Fix 2b — per-image score normalization: TESTED, REJECTED
 
-**Lighting image-AUROC is stuck at 0.512 (≈ random)** while lighting *pixel*-AUROC is a healthy 0.715. This split is diagnostic:
-- The model still localizes defects under lighting (pixel survives).
-- But it can't decide *whether* an image is defective across different lighting (image collapses).
+**Hypothesis.** Lighting image-AUROC is stuck near random (0.512) while lighting *pixel*-AUROC is a
+healthy 0.715. The image score is the top-k% mean of absolute anomaly values, and a global lighting
+shift raises the *whole* map's error baseline by image-dependent amounts, so per-image scores stop
+being comparable across lighting conditions. A score-normalization problem, not a representation flaw.
 
-**Mechanism:** the image score is the top-k% mean of absolute anomaly values. A global lighting shift raises the *whole* map's error baseline by image-dependent amounts, so per-image scores are no longer comparable across lighting conditions. This is a **score-normalization problem, not a representation flaw**.
+**Predicted direction.** Subtract the per-image median and divide by the per-image MAD before the
+top-k image score. Lighting image-AUROC rises well clear of 0.5; clean image-AUROC roughly unchanged.
 
-**Planned next step (Fix 2b):** per-image score normalization (e.g. subtract median, divide by MAD) before computing the top-k image score, to cancel global lighting shifts. Cheap, no retraining, isolates the scoring variable.
+**Result (measured on Kaggle, same checkpoint, both variants scored in one pass over identical maps):**
+
+| Scoring | Clean image | Clean pixel | Lighting image | Lighting pixel |
+|---------|-------------|-------------|----------------|----------------|
+| raw top-1% | 0.936 | 0.908 | 0.551 | 0.720 |
+| median/MAD | 0.642 | 0.885 | **0.451** | 0.728 |
+
+**Wrong in both directions.** Lighting image-AUROC did not recover, it dropped *below chance* (0.451),
+meaning the ranking is now actively inverted. Clean image-AUROC lost 0.29. Pixel-AUROC barely moved,
+which confirms the map was untouched and this is purely a scoring effect.
+
+**Mechanism, two errors:**
+
+1. **The baseline was not pure nuisance.** An image that reconstructs badly overall is genuinely more
+   likely to be defective. Dividing that out discards real signal — which is why the *clean* condition,
+   where lighting was never a confound, collapsed hardest.
+2. **MAD is not defect-invariant.** The argument was that a defect covering a few percent of pixels
+   barely moves median or MAD. The anomaly maps disprove it: the map fires across the whole rim
+   annulus, so a defective image has a visibly wider spread and therefore a *larger* MAD. Dividing by
+   it shrinks exactly the scores that should rank highest. That inversion is why lighting fell below 0.5.
+
+**What the unit tests did and did not establish.** Two tests assert that the normalized score is exactly
+invariant under a simulated affine shift of the anomaly map. They pass, and they were never wrong. The
+error was in what they licensed: invariance to a transformation is not the same property as
+discriminating defects, and real lighting is not a pure affine shift of the anomaly map. A test can pin
+a mechanism correctly and still say nothing about whether that mechanism helps.
+
+**Kept, not deleted.** `normalize_map` stays in `defectloc/anomaly.py` as a non-default option and the
+numbers stay in the results table, so the failure is not retried by accident.
+
+**Also confirmed by this run:** a fresh v3 training run reproduced the notebook within run-to-run spread
+(clean 0.937/0.894 → 0.936/0.908, lighting 0.512/0.715 → 0.551/0.720), which is the evidence that the
+module refactor preserved the numerics.
 
 ---
 
 ## 7. Remaining improvement ladder (planned)
 
-1. **Fix 2b** — per-image score normalization (recover lighting image-AUROC).
+1. **Fix 2c** — calibrate the image score against held-out *normal* images under the same condition,
+   rather than against the image's own pixels, so the defect cannot inflate its own divisor. This is
+   the direct repair of the Fix 2b failure. Alternative: normalize by an input-side statistic (frame
+   brightness) rather than a statistic of the error map.
+   *(Fix 2b — per-image median/MAD normalization — was tested and rejected. See section 6.)*
 2. **Masking-based denoising** — replace additive noise with random patch-masking/inpainting; erases defects more completely, reduces residual false-firing. (Requires retraining.)
 3. **Synthetic defects (DRAEM-style)** — paste fake defect-shaped corruptions on normal images for self-supervised, mask-supervised training. Most likely to push past ~0.95 and lift pixel-F1.
 4. **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start *matching* PatchCore.
@@ -161,3 +200,8 @@ A from-scratch autoencoder reached **clean pixel-AUROC 0.894** vs PatchCore's 0.
 - **Read the split between image-AUROC and pixel-AUROC.** image ≫ pixel = "knows whether, not where" (map quality). pixel healthy but image collapsed = scoring/normalization issue. AUROC vs F1 split = representation vs threshold.
 - **A low training loss can be a warning** (identity shortcut), and a *higher* plateaued loss can be healthier.
 - **Change one thing at a time, with a predicted direction.** That's what makes it research rather than flailing.
+- **A correct diagnosis does not make the first fix correct.** The score-normalization diagnosis still
+  looks right; the median/MAD implementation of it was wrong, because the divisor it chose was itself
+  contaminated by the defect. Diagnosis and remedy need separate evidence.
+- **Watch what a unit test actually claims.** The Fix 2b tests proved affine invariance and passed
+  throughout. Invariance was never the property that mattered.

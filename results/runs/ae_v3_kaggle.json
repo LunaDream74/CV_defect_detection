@@ -1,0 +1,124 @@
+{
+  "label": "Autoencoder v3",
+  "checkpoint": "/kaggle/working/checkpoints/ae_v3.pt",
+  "config": {
+    "img_size": 256,
+    "num_workers": 2,
+    "latent_ch": 64,
+    "epochs": 80,
+    "batch_size": 16,
+    "lr": 0.0002,
+    "noise_sigma": 0.1,
+    "loss_alpha": 0.5,
+    "ssim_window": 11,
+    "topk_frac": 0.01,
+    "seed": 0
+  },
+  "train_seconds": 1930.9,
+  "final_train_loss": 0.06425245392781037,
+  "environment": {
+    "device": "cpu",
+    "torch": "2.10.0+cu128",
+    "ran_on": "kaggle"
+  },
+  "conditions": {
+    "clean": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.9365079365079365,
+          "pixel_AUROC": 0.9080643416445122,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.99,
+              "pixel_AUROC": 0.9325802731606544
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9227272727272727,
+              "pixel_AUROC": 0.9696488303796782
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9,
+              "pixel_AUROC": 0.8573734001082636
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.642063492063492,
+          "pixel_AUROC": 0.8846367672298217,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.6074999999999999,
+              "pixel_AUROC": 0.9040791270749517
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.8068181818181819,
+              "pixel_AUROC": 0.9608145793253774
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.5023809523809524,
+              "pixel_AUROC": 0.8268492837800538
+            }
+          }
+        }
+      },
+      "root": "/kaggle/working/data/MVTecAD/bottle"
+    },
+    "lighting": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.5507936507936508,
+          "pixel_AUROC": 0.7196615118141171,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.55,
+              "pixel_AUROC": 0.7616994706045587
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5090909090909091,
+              "pixel_AUROC": 0.8077159030566243
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.5952380952380952,
+              "pixel_AUROC": 0.6379409383658489
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.45079365079365086,
+          "pixel_AUROC": 0.7277726280451514,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.4775,
+              "pixel_AUROC": 0.7826548246065276
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5227272727272727,
+              "pixel_AUROC": 0.7906784304469934
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.35000000000000003,
+              "pixel_AUROC": 0.6194686047544959
+            }
+          }
+        }
+      },
+      "root": "/kaggle/working/data/MVTecAD_lighting/bottle"
+    }
+  }
+}

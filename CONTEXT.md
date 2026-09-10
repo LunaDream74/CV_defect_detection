@@ -32,31 +32,39 @@ The notebook has been refactored into a runnable package. This folder is a git r
 | Model | Clean image-AUROC | Clean pixel-AUROC | Lighting image-AUROC | Lighting pixel-AUROC |
 |-------|---|---|---|---|
 | PatchCore (baseline, Anomalib) | 1.000 | 0.986 | 0.947 | 0.973 |
-| Autoencoder v3 (this project) | 0.937 | **0.894** | **0.512** | 0.715 |
-| Autoencoder v3 + median/MAD score | — | — | — | — |
+| Autoencoder v3 (notebook run) | 0.937 | 0.894 | 0.512 | 0.715 |
+| Autoencoder v3 (re-run post-refactor) | 0.936 | **0.908** | **0.551** | 0.720 |
+| Autoencoder v3 + median/MAD score (rejected) | 0.642 | 0.885 | 0.451 | 0.728 |
 
 Chance AUROC is 0.500. Built from scratch: v1 0.700 → v2 0.741 (tighter bottleneck + denoising,
 killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retraining).
 
-The v1–v3 numbers are the recorded Kaggle-run results, carried over with provenance in
-`results/history.json`; they have not been re-measured since the refactor.
+The post-refactor re-run reproduces the notebook within run-to-run spread, which is the evidence
+that the refactor preserved the numerics.
 
 ## The open issue, stated precisely
 
-Under the lighting stress test, pixel-AUROC holds at 0.715 but image-AUROC collapses to 0.512 —
-random. This is **score normalisation, not representation**: a global lighting shift moves each
-image's error baseline by a different amount, so per-image scores stop being comparable.
+Under the lighting stress test, pixel-AUROC holds at 0.720 but image-AUROC sits near chance (0.551).
+This is **score normalisation, not representation**: a global lighting shift moves each image's error
+baseline by a different amount, so per-image scores stop being comparable.
 
-**The fix is now implemented** (`defectloc/anomaly.py::normalize_map`, exposed as
-`image_score(..., norm="median_mad")`) and unit-tested for invariance under a simulated lighting
-shift. It has **not** been measured on MVTec AD — this machine has no copy of the dataset — so the
-last table row is empty rather than guessed. Filling it needs no retraining, just the v3 checkpoint
-and the two commands in README § Reproducing the table.
+**The first fix was measured and rejected.** Per-image median/MAD normalisation
+(`defectloc/anomaly.py::normalize_map`) made image-AUROC *worse* in both conditions: clean
+0.936 → 0.642, lighting 0.551 → 0.451, the latter below chance and therefore inverted. Two reasons,
+both in README § Fix 2b: what happened. The overall reconstruction error it divided out was real
+signal, and MAD is not defect-invariant because the map fires across the whole rim annulus, so a
+defective image gets a larger divisor. The code and the numbers are kept so the failure is not
+retried by accident.
+
+The diagnosis still stands; the remedy does not. Next candidate (Fix 2c) is to calibrate against
+held-out normal images rather than against the image's own pixels, so the defect cannot inflate its
+own divisor.
 
 ## Status
 
-Refactor done, scoring fix landed but unmeasured. The next action is a measurement run, not more
-code. No stage folders: the pipeline is a package with a CLI, not a staged workflow.
+Refactor done and validated by a reproduction run. Fix 2b tested and rejected. The next action is
+Fix 2c, or tightening the map's rim over-firing, which is the more fundamental problem. No stage
+folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints
 

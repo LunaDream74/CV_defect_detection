@@ -8,10 +8,11 @@ data/
 MVTecAD/
 MVTecAD_lighting/
 
-# Run artefacts
+# Run artefacts.
+# Checkpoints stay out: 7.6 MB binaries that `defectloc.train` regenerates.
+# Figures and run JSONs stay IN: the README links the figures, and the run JSON
+# is the evidence behind every measured row of the results table.
 checkpoints/*.pt
-results/figures/*.png
-results/runs/
 
 # OS / editor
 .DS_Store
