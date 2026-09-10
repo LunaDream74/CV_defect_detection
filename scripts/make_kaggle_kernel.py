@@ -13,6 +13,7 @@ Writes kaggle_kernel/ (notebook + kernel-metadata.json), which is what
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -244,7 +245,9 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--username", default="YOUR_KAGGLE_USERNAME",
                    help="Kaggle username; required by kernel-metadata.json before pushing")
-    p.add_argument("--slug", default="bottle-defect-mad-score")
+    p.add_argument("--title", default="Bottle defect MAD score",
+                   help="kernel title; the slug is derived from it, because Kaggle "
+                        "resolves the ref from the title and ignores a conflicting id")
     p.add_argument("--category", default="bottle")
     p.add_argument("--epochs", type=int, default=80)
     p.add_argument("--seed", type=int, default=0)
@@ -253,17 +256,22 @@ def main(argv=None) -> int:
                    help="publish the kernel publicly (default: private)")
     a = p.parse_args(argv)
 
+    # Kaggle derives the kernel ref from the TITLE and warns (then overrides) when a
+    # supplied id disagrees. Deriving the slug here keeps metadata, the pushed ref and
+    # the status/output commands in agreement.
+    slug = re.sub(r"[^a-z0-9]+", "-", a.title.lower()).strip("-")
+
     out_dir = REPO / a.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
-    nb_name = f"{a.slug}.ipynb"
+    nb_name = f"{slug}.ipynb"
 
     (out_dir / nb_name).write_text(
         json.dumps(build_notebook(a.category, a.epochs, a.seed), indent=1), encoding="utf-8"
     )
 
     metadata = {
-        "id": f"{a.username}/{a.slug}",
-        "title": "Bottle defect localisation - median/MAD score",
+        "id": f"{a.username}/{slug}",
+        "title": a.title,
         "code_file": nb_name,
         "language": "python",
         "kernel_type": "notebook",

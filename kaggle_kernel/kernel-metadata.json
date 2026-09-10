@@ -1,6 +1,6 @@
 {
   "id": "lunaticdream74/bottle-defect-mad-score",
-  "title": "Bottle defect localisation - median/MAD score",
+  "title": "Bottle defect MAD score",
   "code_file": "bottle-defect-mad-score.ipynb",
   "language": "python",
   "kernel_type": "notebook",
