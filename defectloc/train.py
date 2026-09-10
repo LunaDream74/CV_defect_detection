@@ -7,6 +7,7 @@ import argparse
 import json
 import random
 import time
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -27,10 +28,47 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
+def cuda_is_usable() -> bool:
+    """Whether CUDA is present AND this torch build can actually run on the GPU.
+
+    `torch.cuda.is_available()` is not enough. It reports True for a GPU whose
+    compute capability the installed torch was not compiled for, and the failure
+    only surfaces later as "no kernel image is available for execution on the
+    device", mid-training. Kaggle hits this exactly: it may hand out a Tesla
+    P100 (sm_60) alongside a torch build supporting sm_70 and up.
+
+    So run a real convolution and see. A probe that costs microseconds beats a
+    crash an hour into a run.
+    """
+    if not torch.cuda.is_available():
+        return False
+    try:
+        x = torch.zeros(1, 3, 8, 8, device="cuda")
+        w = torch.zeros(3, 3, 3, 3, device="cuda")
+        torch.nn.functional.conv2d(x, w, padding=1)
+        torch.cuda.synchronize()
+        return True
+    except Exception as e:  # noqa: BLE001 - any CUDA failure means fall back
+        name = "unknown GPU"
+        try:
+            name = torch.cuda.get_device_name(0)
+        except Exception:  # noqa: BLE001
+            pass
+        warnings.warn(
+            f"CUDA reports available but is not usable on {name} ({type(e).__name__}: {e}). "
+            "Falling back to CPU. Training will be much slower; pass --device cuda to "
+            "override and see the real error.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return False
+
+
 def pick_device(requested: str = "auto") -> torch.device:
+    """Resolve the device. 'auto' falls back to CPU when the GPU cannot run our ops."""
     if requested != "auto":
         return torch.device(requested)
-    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return torch.device("cuda" if cuda_is_usable() else "cpu")
 
 
 def train(root, cfg: Config, device: torch.device, log_every: int = 10, verbose: bool = True):
