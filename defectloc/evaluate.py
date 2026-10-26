@@ -26,6 +26,7 @@ from defectloc.anomaly import anomaly_map, image_score, normalize_map
 from defectloc.calibrate import NormalStats, fit_normal_stats, normal_maps, z_map
 from defectloc.config import Config
 from defectloc.data import TestSet, TrainGood
+from defectloc.preprocess import prepare
 from defectloc.train import load_checkpoint, pick_device, set_seed
 
 SCORE_VARIANTS = ("none", "median_mad")
@@ -71,7 +72,7 @@ def evaluate(model, root, cfg: Config, device, batch_size: int = 8,
     img_scores = {v: [] for v in variants}
 
     for imgs, masks, labels in loader:
-        amaps = anomaly_map(model, imgs.to(device), win=cfg.ssim_window)  # B,H,W
+        amaps = anomaly_map(model, prepare(imgs.to(device), cfg), win=cfg.ssim_window)  # B,H,W
         masks = masks.numpy()
         for amap, m, lab in zip(amaps, masks, labels.numpy()):
             pixel_gt.append(m.ravel())
@@ -163,7 +164,8 @@ def main(argv=None) -> int:
     # and against the clean statistics ("pixel_z_cleancal", which does not).
     calib_by_cond = {"clean": {}, "lighting": {}}
     if cfg.calib_holdout > 0:
-        held = TrainGood(args.clean_root, cfg.img_size, cfg.calib_holdout, cfg.seed,
+        held = TrainGood(args.clean_root, cfg.img_size, cfg.calib_holdout,
+                         split_seed=cfg.holdout_seed,
                          part="holdout").paths
         recorded = ckpt.get("calib_holdout_files")
         if recorded is not None and recorded != [p.name for p in held]:

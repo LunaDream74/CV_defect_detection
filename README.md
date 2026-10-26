@@ -23,6 +23,9 @@ Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" str
 | ↳ + per-pixel z, clean calibration (rejected) | 0.958 | 0.869 | 0.511 | 0.597 |
 | **Autoencoder v3 + lighting-augmented training** | 0.937 | 0.898 | **0.802** | **0.839** |
 | ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
+| ↳ lighting augmentation, mean of 3 seeds | 0.938 | 0.887 | **0.887** | 0.850 |
+| ↳ shadow held out + flat-field input (rejected) | 0.947 | 0.909 | 0.860 | 0.867 |
+| Autoencoder v3 + flat-field input only (1 seed, unreplicated) | **0.987** | **0.921** | 0.829 | 0.834 |
 
 The autoencoder reaches a clean pixel-AUROC of **0.908** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
 
@@ -30,7 +33,7 @@ The re-run reproduces the notebook within run-to-run spread (clean 0.937/0.894 �
 
 Every number and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`.
 
-> **The lighting failure was representation, and training under varied lighting closes most of it.** Under the stress test, image-AUROC sat near chance (0.551) while pixel-AUROC looked healthy (0.720), which was read as a scoring problem. Two scoring fixes built on that reading failed ([Fix 2b](#fix-2b-what-happened), [Fix 2c](#fix-2c-what-happened)). Splitting the lighting set by the replayed shadow labels showed the ranking was *inverted* on shadowed frames, where the reconstruction collapses. Lighting-augmented training lifts lighting image-AUROC from 0.573 to 0.802 at a cost of 0.011 clean ([Experiment 3](#experiment-3-what-happened)). The gain holds for the perturbations the model trained on; a shadow it never saw is still not handled.
+> **The lighting failure was representation, and training under varied lighting closes most of it.** Under the stress test, image-AUROC sat near chance (0.551) while pixel-AUROC looked healthy (0.720), which was read as a scoring problem. Two scoring fixes built on that reading failed ([Fix 2b](#fix-2b-what-happened), [Fix 2c](#fix-2c-what-happened)). Splitting the lighting set by the replayed shadow labels showed the ranking was *inverted* on shadowed frames, where the reconstruction collapses. Lighting-augmented training lifts lighting image-AUROC from 0.573 to 0.887 ± 0.074 over three seeds, at a cost of about 0.01 clean ([Experiment 3](#experiment-3-what-happened)). That gain covers only the perturbations the model trained on. Flat-fielding the input covers a shadow the model never saw, but costs the other perturbations ([Experiment 4](#experiment-4-what-happened)). Flat-fielding on its own also gave the best clean numbers so far (0.987 / 0.921), from a single unreplicated run.
 
 ---
 
@@ -202,11 +205,76 @@ Lighting image-AUROC rose by 0.229 against a bar of 0.10, at a cost of 0.011 cle
 
 **What B adds.** Training on brightness, contrast, gamma and colour shifts makes the model nearly immune to them (0.957 unshadowed, above its own clean 0.948). It does not transfer to a shadow it never saw (0.457). Robustness came from coverage of the specific perturbation, not from a general ability to handle lighting.
 
-**How far this goes.** Arm A trained on the same transform family the test uses, with different random draws. It shows the lighting failure is learnable. It does not show the model would survive lighting no one anticipated, and B suggests it would not. Each arm is one seed. Earlier re-runs moved lighting image-AUROC by about 0.05, well under A's +0.229. The shadowed subset has 7 good images, so each one moves its image-AUROC by up to 0.14, and its numbers are directions, not precise values.
+**How far this goes.** Arm A trained on the same transform family the test uses, with different random draws. It shows the lighting failure is learnable. It does not show the model would survive lighting no one anticipated, and B suggests it would not. Each arm was one seed when judged. Arm A has since been re-run on seeds 1 and 2 with the same 179-image split ([`ae_v3_lightaug_seed1.json`](results/runs/ae_v3_lightaug_seed1.json), [`_seed2.json`](results/runs/ae_v3_lightaug_seed2.json)):
+
+| Arm A | Clean image | Clean pixel | Lighting image | Shadowed | Unshadowed |
+|---|:---:|:---:|:---:|:---:|:---:|
+| seed 0 | 0.937 | 0.898 | 0.802 | 0.740 | 0.838 |
+| seed 1 | 0.936 | 0.877 | 0.937 | 0.909 | 0.951 |
+| seed 2 | 0.940 | 0.885 | 0.921 | 0.909 | 0.929 |
+| **mean ± sd** | 0.938 ± 0.003 | 0.887 ± 0.010 | **0.887 ± 0.074** | 0.852 ± 0.097 | 0.906 ± 0.060 |
+
+Seed 0 was the lowest run, so the gain is larger than first reported. Every seed clears the lighting bar by a wide margin. Seed 1's clean pixel-AUROC (0.877) is 0.005 under the bar seed 0 was judged on; the mean clears it. The bigger lesson is the spread itself. Lighting image-AUROC varies by 0.136 across seeds while clean varies by 0.005, so **a single-seed lighting comparison between two arms means little unless the gap is several tenths**. Earlier in this README I assumed about 0.05; that was wrong by a factor of more than two. The shadowed subset has 7 good images, so each one moves its image-AUROC by up to 0.14, and its numbers are directions, not precise values.
 
 On clean images arm A's maps look like the baseline's ([`results/figures/exp3_clean_lightaug.png`](results/figures/exp3_clean_lightaug.png)). Two small differences: the reconstructed background carries a faint warm cast, learned from the colour-temperature transform, and the one-pixel frame border fires slightly more. Neither touches the defect regions, which fits the small clean cost.
 
 Per-pixel z on top of arm A raises lighting image-AUROC to 0.839 but costs clean pixel-AUROC (0.898 → 0.831), the same rim trade as Fix 2c. Not adopted.
+
+## Experiment 4: flat-field input for unseen lighting
+
+*Design and prediction written 2026-10-26, before training. Arm A's seed replicates were running at the time; they do not inform this design.*
+
+**Question.** Experiment 3's arm B handles the lighting changes it trained on and fails on the shadow it never saw (0.457). Can a preprocessing step built on a physical prior cover a perturbation the model was never shown?
+
+**Method.** A shadow multiplies the image by a smooth gradient, `m(p)·I(p)`. When `m` varies slowly relative to the blur, `blur(m·I) ≈ m·blur(I)`, so
+
+`flat(I) = clip(I / max(blur_σ(I), floor) · gain, 0, 1)`
+
+cancels `m` without knowing it is there, while local defects survive the division. [`defectloc/preprocess.py`](defectloc/preprocess.py) applies it, per channel, to every image the model sees: training, test, calibration and figures. The parameters were fixed from training images, not tuned against any result. σ = 16 px at 256 (1/16 of the frame, so rim rings survive and a frame-wide gradient does not). floor = 0.05, a safety bound that never binds on a normal frame, since the darkest blurred training value is about 0.14. gain = 0.4, since the 99.9th-percentile ratio on training images is 2.09, so clipping starts only above 2.5.
+
+**A check before measuring, on training images only.** Mean absolute change caused by a perturbation, in units of each domain's pixel spread:
+
+| Perturbation | raw input | flat-fielded input |
+|---|:---:|:---:|
+| `DirectionalShadow` alone | 0.264 | **0.024** |
+| full lighting pipeline | 0.444 | 0.555 |
+
+Flat-fielding removes about 90% of a shadow and none of the rest. Brightness offsets, contrast and gamma are not smooth multiplications, and dividing by a local mean even amplifies some of them. So flat-fielding is a candidate for the *shadow's* part of the problem, not a substitute for augmentation.
+
+**Design.** Two arms, both seed 0 and the same 179-image split:
+
+- **C = arm B + flat-field.** Trained on lighting changes *without* the shadow, as in B, with flat-field on every input. The shadowed test subset is a perturbation C never saw, which is the question.
+- **D = baseline + flat-field, no augmentation.** Diagnostic: how far the prior goes on its own.
+
+**Prediction.** C lifts the shadowed subset well above B's 0.457 and keeps B's unshadowed performance and clean numbers. D improves the shadowed subset over the baseline's 0.269 but does little for the unshadowed one (0.731), per the check above.
+
+**Accept criterion for C, fixed in advance.** All four must hold:
+
+- shadowed-subset image-AUROC ≥ 0.65. The subset has 7 good images, so the bar sits well clear of B's 0.457.
+- unshadowed image-AUROC ≥ 0.90. This is looser than B's 0.957 by design, because the check above shows flat-fielding amplifies some non-shadow changes.
+- clean image-AUROC ≥ 0.928 and clean pixel-AUROC ≥ 0.869, at most 0.02 below B's clean 0.948 and 0.889.
+
+D has no pass/fail.
+
+### Experiment 4: what happened
+
+**Arm C rejected on one bound. Arm D is the most promising result in the project, and it is unreplicated.** Raw score, seed 0 ([`ae_v3_noshadow_flat.json`](results/runs/ae_v3_noshadow_flat.json), [`ae_v3_flat.json`](results/runs/ae_v3_flat.json)):
+
+| | Clean image | Clean pixel | Lighting image | Lighting pixel | Shadowed | Unshadowed |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| baseline | 0.948 | 0.902 | 0.573 | 0.728 | 0.269 | 0.731 |
+| B (no shadow in training) | 0.948 | 0.889 | 0.783 | 0.850 | 0.457 | 0.957 |
+| **C = B + flat-field** | 0.947 | 0.909 | 0.860 | 0.867 | **0.926** | 0.846 |
+| **D = flat-field only** | **0.987** | **0.921** | 0.829 | 0.834 | 0.863 | 0.808 |
+| A, three-seed mean | 0.938 | 0.887 | 0.887 | 0.850 | 0.852 | 0.906 |
+
+**C covers the shadow it never saw.** The shadowed subset goes from 0.457 to 0.926, a gap almost five times the seed spread. [`results/figures/exp4_lighting_noshadow_flat.png`](results/figures/exp4_lighting_noshadow_flat.png), row 3: the flattened input carries no trace of the shadow and the map sits on the break. Clean held (0.947 / 0.909). But unshadowed image-AUROC fell from 0.957 to 0.846, under its 0.90 floor, so C fails as pre-registered. The check before training predicted the direction: dividing by a local mean amplifies brightness offsets, contrast and gamma, which are not multiplicative. It did not predict the size. The shortfall (0.054) is about one seed-spread wide, so a replicate could land above the floor. That is a reason to replicate, not to move the bar.
+
+**D was not predicted.** With no lighting augmentation at all, flat-fielding alone gave the best clean numbers any autoencoder here has reached: 0.987 image, 0.921 pixel, against 0.948 / 0.902 for the same split without it. [`results/figures/exp4_clean_flat.png`](results/figures/exp4_clean_flat.png) suggests why. The near-black interior is lifted to mid-grey and its texture becomes visible, and the white background becomes uniform grey, which removes the frame-border response seen in earlier maps. Under lighting, D reaches 0.829 (shadowed 0.863) without ever seeing a lighting change, which is inside arm A's seed range. The prediction was right about the shadow and wrong about the rest: unshadowed rose 0.731 → 0.808 instead of staying flat.
+
+**How much to trust D.** Its clean gain (+0.039 image) is about thirteen times arm A's clean seed spread, but D's own spread is unmeasured, and the gain was not predicted. A surprising single run is exactly what needs replicating before it goes in a headline. Visible cost: the lifted interior is grainier and the map picks up a small swirl at the centre on some bottles.
+
+What is kept: `defectloc/preprocess.py` (off by default) and both checkpoints' run files.
 
 ---
 
@@ -240,6 +308,7 @@ defectloc/            the pipeline
   augment.py          the factory-lighting pipeline (seeded; shadow optional)
   anomaly.py          local-SSIM map, top-k score, median/MAD normalization
   calibrate.py        Fix 2c: per-pixel statistics of held-out normal maps, z map
+  preprocess.py       Experiment 4: flat-field input (off by default)
   train.py            training + checkpoint I/O
   evaluate.py         image/pixel AUROC, every scoring variant, per-defect-type, shadow subsets
   visualize.py        input / reconstruction / map / ground-truth figures
@@ -249,7 +318,7 @@ scripts/
   patchcore_baseline.py   re-run the PatchCore reference row (optional, heavy)
   make_synthetic_fixture.py  tiny procedural dataset for smoke tests
   label_lighting_subsets.py  replay the lighting build, label shadowed test images
-tests/test_smoke.py   23 plumbing and invariant tests, no GPU or dataset needed
+tests/test_smoke.py   25 plumbing and invariant tests, no GPU or dataset needed
 results/              history.json (recorded, with provenance) + generated results.md
 ```
 
@@ -328,6 +397,8 @@ python -m defectloc.evaluate --checkpoint checkpoints/ae_v3_lightaug.pt \
 
 On this laptop's CPU, arm A took 27 minutes and arm B 20.
 
+Experiment 4 adds flat-field input with `--flatfield-sigma 16` (stored in the checkpoint, so `evaluate` and `visualize` apply it on their own). Arm C adds `--train-lighting-p 0.5 --no-train-shadow`; arm D uses the flag alone. Each took 35–38 minutes on CPU. `--seed N` varies training only; the calibration split is fixed by `holdout_seed` (default 0).
+
 ### Reproducing the table
 
 ```bash
@@ -368,7 +439,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -q
 ```
 
-23 tests, about 15 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
+25 tests, about 20 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
 
 ### PatchCore baseline (optional)
 
@@ -397,8 +468,10 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 - [x] **Fix 2b — per-image median/MAD score normalization.** Measured and **rejected**: image-AUROC fell in both conditions (clean 0.936 → 0.642, lighting 0.551 → 0.451). Kept in the code as an option, and in the table as a recorded negative result. See [Fix 2b: what happened](#fix-2b-what-happened).
 - [x] **Fix 2c — per-pixel calibration against held-out normal images.** Measured and **rejected**: lighting image-AUROC 0.573 → 0.569 against a pre-registered bar of +0.05. It helps interior contamination (pixel 0.847 → 0.963) and hurts rim breakage (broken_large 0.927 → 0.800). See [Fix 2c: what happened](#fix-2c-what-happened).
 - [x] **Lighting-augmented training.** Measured and **accepted**: lighting image-AUROC 0.573 → 0.802, clean −0.011. The shadowed subset went from inverted (0.269) to 0.740. Holding the shadow out of training (arm B) leaves it at 0.457. See [Experiment 3: what happened](#experiment-3-what-happened).
-- [ ] **Robustness to unseen lighting** — B shows coverage, not generality. Candidates: a broader or stronger photometric family in training, or a per-image input normalisation (e.g. flat-field the frame against its own low-frequency illumination) that removes a shadow gradient before the model sees it. Judge on a held-out perturbation, as B does.
-- [ ] **Seed spread** — re-run arm A on two more seeds before quoting 0.802 as more than one run.
+- [x] **Seed spread for arm A.** Three seeds: lighting image-AUROC 0.887 ± 0.074; seed 0 was the lowest. Lighting numbers swing by about 0.14 across seeds, clean by about 0.005.
+- [x] **Flat-field input (Experiment 4).** Arm C (no shadow in training + flat-field) covers the unseen shadow (0.457 → 0.926) but fails its unshadowed floor (0.846 < 0.90): **rejected**. Arm D (flat-field only) gave the best clean numbers so far (0.987 / 0.921), unreplicated. See [Experiment 4: what happened](#experiment-4-what-happened).
+- [ ] **Replicate D and C** on seeds 1 and 2 before either goes in a headline. D first: if its clean gain holds, flat-field becomes the default input.
+- [ ] **Flat-field + full lighting augmentation** (arm A + flat-field), judged on three seeds from the start.
 - [ ] **Masking-based denoising** — replace additive noise with random patch masking/inpainting to erase defects more completely and reduce false-firing.
 - [ ] **Synthetic defects (DRAEM-style)** — paste defect-shaped corruptions on normal images for self-supervised, mask-supervised training; expected to push past ~0.95 and improve pixel-F1.
 - [ ] **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start matching memory-bank methods like PatchCore.

@@ -195,6 +195,8 @@ def test_holdout_split_is_deterministic_and_disjoint(fixture_root):
     assert TrainGood(fixture_root, holdout=5).paths == tr
     with pytest.raises(ValueError):
         split_holdout(paths, len(paths), seed=0)
+    # A training-seed replicate must train on the same images.
+    assert TrainGood(fixture_root, holdout=5, seed=3, split_seed=0).paths == tr
 
 
 # --------------------------------------------------------------------------
@@ -275,9 +277,10 @@ def test_end_to_end_with_calibration_holdout(fixture_root, tmp_path):
     assert tr.main(["--data-root", str(fixture_root), "--out", str(ckpt), "--epochs", "1",
                     "--img-size", "64", "--batch-size", "8", "--calib-holdout", "4",
                     "--train-lighting-p", "0.5", "--no-train-shadow",
-                    "--device", "cpu"]) == 0
+                    "--flatfield-sigma", "4", "--device", "cpu"]) == 0
     _, saved_cfg, _ = tr.load_checkpoint(ckpt, torch.device("cpu"))
     assert saved_cfg.train_lighting_p == 0.5 and saved_cfg.train_lighting_shadow is False
+    assert saved_cfg.flatfield_sigma == 4.0, "evaluate must re-apply the same preprocessing"
     out = tmp_path / "run.json"
     assert ev.main(["--checkpoint", str(ckpt), "--clean-root", str(fixture_root),
                     "--lighting-root", str(fixture_root), "--out", str(out),
@@ -377,6 +380,38 @@ def test_evaluate_reports_shadow_subsets(fixture_root, tmp_path):
     shadow.pop(next(iter(shadow)))
     with pytest.raises(ValueError):
         evaluate(model, lit, cfg, torch.device("cpu"), batch_size=4, shadow=shadow)
+
+
+# --------------------------------------------------------------------------
+# Experiment 4: flat-field input
+# --------------------------------------------------------------------------
+
+def test_flatfield_cancels_a_smooth_multiplicative_gradient_but_keeps_a_local_defect():
+    from defectloc.preprocess import flatfield
+
+    rng = np.random.default_rng(0)
+    img = torch.from_numpy(rng.uniform(0.3, 0.7, (1, 3, 128, 128)).astype(np.float32))
+    img[..., 60:66, 60:66] = 0.05                       # a small dark defect
+    ramp = torch.linspace(0.5, 1.0, 128).view(1, 1, 1, 128)  # frame-wide shadow
+    flat, flat_shadowed = flatfield(img, sigma=8), flatfield(img * ramp, sigma=8)
+    interior = (..., slice(30, 98), slice(30, 98))      # away from blur edge effects
+    raw_change = (img * ramp - img)[interior].abs().mean()
+    flat_change = (flat_shadowed - flat)[interior].abs().mean()
+    assert flat_change < raw_change / 5, "the gradient must largely cancel"
+    defect = flat[..., 60:66, 60:66].mean()
+    around = flat[..., 50:76, 50:76].mean()
+    assert defect < around / 2, "a local defect must survive the division"
+    assert 0.0 <= float(flat.min()) and float(flat.max()) <= 1.0
+
+
+def test_flatfield_is_off_by_default_and_rejects_a_kernel_larger_than_the_image():
+    from defectloc.preprocess import flatfield, prepare
+
+    x = torch.rand(1, 3, 32, 32)
+    assert torch.equal(prepare(x, Config()), x)
+    assert not torch.equal(prepare(x, Config(flatfield_sigma=2.0)), x)
+    with pytest.raises(ValueError):
+        flatfield(x, sigma=16.0)
 
 
 def test_reconstruction_is_deterministic_given_a_seed(fixture_root):

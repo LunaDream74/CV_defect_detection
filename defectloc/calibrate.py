@@ -30,6 +30,7 @@ from defectloc.anomaly import anomaly_map
 from defectloc.augment import build_factory_lighting
 from defectloc.config import Config
 from defectloc.data import load_img, load_lit
+from defectloc.preprocess import prepare
 
 # Seed 0 builds the lighting TEST set (scripts/prepare_data.py). Calibration
 # draws from the same lighting distribution with a different seed, so no
@@ -60,6 +61,7 @@ def normal_maps(model, paths: List[Path], cfg: Config, device, lighting: bool = 
     maps = []
     for i in range(0, len(imgs), batch_size):
         x = torch.from_numpy(np.stack(imgs[i:i + batch_size])).permute(0, 3, 1, 2).to(device)
+        x = prepare(x, cfg)
         maps.append(anomaly_map(model, x, win=cfg.ssim_window))
     return np.concatenate(maps)
 

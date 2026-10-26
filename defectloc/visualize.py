@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from defectloc.anomaly import anomaly_map, normalize_map  # noqa: E402
 from defectloc.calibrate import fit_normal_stats, normal_maps, z_map  # noqa: E402
 from defectloc.data import TestSet, TrainGood  # noqa: E402
+from defectloc.preprocess import prepare  # noqa: E402
 from defectloc.train import load_checkpoint, pick_device  # noqa: E402
 
 
@@ -38,7 +39,7 @@ def make_figure(model, cfg, root, device, n: int = 3, out=None, normalized: bool
 
     for row, idx in enumerate(defective):
         img, mask, _ = ds[idx]
-        x = img.unsqueeze(0).to(device)
+        x = prepare(img.unsqueeze(0).to(device), cfg)
         recon = model(x)[0].cpu().permute(1, 2, 0).numpy()
         amap = anomaly_map(model, x, win=cfg.ssim_window)[0]
         suffix = ""
@@ -49,7 +50,8 @@ def make_figure(model, cfg, root, device, n: int = 3, out=None, normalized: bool
 
         defect_type = ds.items[idx][0].parent.name
         panels = [
-            (img.permute(1, 2, 0).numpy(), f"input ({defect_type})", None),
+            (x[0].cpu().permute(1, 2, 0).numpy(),
+             f"input ({defect_type})" + (" flat-fielded" if cfg.flatfield_sigma > 0 else ""), None),
             (recon, "reconstruction", None),
             (amap, "anomaly map" + suffix, "inferno"),
             (mask.numpy(), "ground truth", "gray"),
@@ -88,7 +90,8 @@ def main(argv=None) -> int:
     model, cfg, _ = load_checkpoint(a.checkpoint, device)
     stats = None
     if a.zmap:
-        held = TrainGood(a.train_root or a.data_root, cfg.img_size, cfg.calib_holdout, cfg.seed,
+        held = TrainGood(a.train_root or a.data_root, cfg.img_size, cfg.calib_holdout,
+                         split_seed=cfg.holdout_seed,
                          part="holdout").paths
         lit = a.zmap == "lighting"
         stats = fit_normal_stats(

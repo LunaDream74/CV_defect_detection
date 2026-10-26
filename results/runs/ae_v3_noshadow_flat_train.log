@@ -1,0 +1,12 @@
+device: cpu  |  config: {"img_size": 256, "num_workers": 0, "latent_ch": 64, "epochs": 80, "batch_size": 16, "lr": 0.0002, "noise_sigma": 0.1, "loss_alpha": 0.5, "ssim_window": 11, "topk_frac": 0.01, "calib_holdout": 30, "holdout_seed": 0, "calib_copies": 4, "train_lighting_p": 0.5, "train_lighting_shadow": false, "train_lighting_seed": 2, "flatfield_sigma": 16.0, "flatfield_floor": 0.05, "flatfield_gain": 0.4, "seed": 0}
+epoch   1/80  loss 0.3434
+epoch  10/80  loss 0.2638
+epoch  20/80  loss 0.2551
+epoch  30/80  loss 0.1948
+epoch  40/80  loss 0.1222
+epoch  50/80  loss 0.1069
+epoch  60/80  loss 0.0994
+epoch  70/80  loss 0.0970
+epoch  80/80  loss 0.0914
+
+trained in 2115.1s  ->  checkpoints\ae_v3_noshadow_flat.pt

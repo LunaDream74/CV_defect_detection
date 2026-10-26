@@ -73,8 +73,9 @@ def split_holdout(paths: List[Path], n_holdout: int, seed: int = 0) -> Tuple[Lis
 class TrainGood(Dataset):
     """Normal images only -- the model never sees a defect during training.
 
-    ``holdout`` images are withheld (see `split_holdout`); ``part`` picks which
-    side of the split this dataset serves.
+    ``holdout`` images are withheld (see `split_holdout`, seeded by
+    ``split_seed``, default ``seed``); ``part`` picks which side of the split
+    this dataset serves.
 
     ``lighting`` (an albumentations pipeline, Experiment 3) is applied to each
     sample with probability ``lighting_p``, at full resolution before the
@@ -84,7 +85,8 @@ class TrainGood(Dataset):
     """
 
     def __init__(self, root, img_size: int = IMG_SIZE, holdout: int = 0, seed: int = 0,
-                 part: str = "train", lighting=None, lighting_p: float = 0.0):
+                 part: str = "train", lighting=None, lighting_p: float = 0.0,
+                 split_seed: Optional[int] = None):
         self.img_size = img_size
         self.lighting = lighting
         self.lighting_p = lighting_p if lighting is not None else 0.0
@@ -98,7 +100,7 @@ class TrainGood(Dataset):
             )
         if part not in ("train", "holdout"):
             raise ValueError(f"part must be 'train' or 'holdout', got {part!r}")
-        train, held = split_holdout(paths, holdout, seed)
+        train, held = split_holdout(paths, holdout, seed if split_seed is None else split_seed)
         self.paths: List[Path] = train if part == "train" else held
 
     def __len__(self) -> int:

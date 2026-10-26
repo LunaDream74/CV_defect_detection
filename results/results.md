@@ -19,6 +19,10 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 | Autoencoder v3 + per-pixel z, clean calibration (REJECTED) | 0.958 | 0.869 | 0.511 | 0.597 | local-run |
 | Autoencoder v3 - 179-image train + lighting augmentation (ACCEPTED) | 0.937 | **0.898** | 0.802 | 0.839 | local-run |
 | Autoencoder v3 - 179-image train + lighting augmentation, shadow held out | 0.948 | **0.889** | 0.783 | 0.850 | local-run |
+| Autoencoder v3 - lighting augmentation, seed 1 | 0.936 | **0.877** | 0.937 | 0.858 | local-run |
+| Autoencoder v3 - lighting augmentation, seed 2 | 0.940 | **0.885** | 0.921 | 0.854 | local-run |
+| Autoencoder v3 - lighting augmentation without shadow + flat-field (REJECTED) | 0.947 | **0.909** | 0.860 | 0.867 | local-run |
+| Autoencoder v3 - flat-field input only, no augmentation | 0.987 | **0.921** | 0.829 | 0.834 | local-run |
 
 ## Provenance
 
@@ -41,9 +45,17 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 - **Autoencoder v3 + per-pixel z, clean calibration (REJECTED)** — Same run, same anomaly maps. Lighting images scored against the CLEAN held-out statistics.
   - The stricter variant, which assumes nothing about the lighting: worse than raw under lighting (image 0.573 -> 0.511, pixel 0.728 -> 0.597). Clean columns equal the row above by construction.
 - **Autoencoder v3 - 179-image train + lighting augmentation (ACCEPTED)** — results/runs/ae_v3_lightaug.json. Same split, seed and 80 epochs as the 179-image row; the only change is the factory-lighting pipeline (seed 2) applied to half the samples, target = the lit image. Local CPU, 1620 s.
-  - Experiment 3 arm A passed its pre-registered bar (lighting image >= 0.673, clean image >= 0.928, clean pixel >= 0.882): lighting 0.573 -> 0.802 image, 0.728 -> 0.839 pixel, clean 0.948 -> 0.937 / 0.902 -> 0.898. Shadowed subset 0.269 -> 0.740, unshadowed 0.731 -> 0.838. The shadowed reconstruction that collapsed is intact (results/figures/exp3_lighting_lightaug.png): the lighting failure was representation, not scoring. One seed; trained on the test's transform family with different draws.
+  - Experiment 3 arm A passed its pre-registered bar (lighting image >= 0.673, clean image >= 0.928, clean pixel >= 0.882): lighting 0.573 -> 0.802 image, 0.728 -> 0.839 pixel, clean 0.948 -> 0.937 / 0.902 -> 0.898. Shadowed subset 0.269 -> 0.740, unshadowed 0.731 -> 0.838. The shadowed reconstruction that collapsed is intact (results/figures/exp3_lighting_lightaug.png): the lighting failure was representation, not scoring. One seed; trained on the test's transform family with different draws. Seeds 1 and 2 (rows below) give lighting image-AUROC 0.937 and 0.921: across three seeds 0.887 +/- 0.074, so seed 0 was the lowest and the gain is larger than first measured. Clean is steady (image 0.938 +/- 0.003, pixel 0.887 +/- 0.010). Seed 1's clean pixel 0.877 slips 0.005 under the bar seed 0 was judged on; the mean clears it.
 - **Autoencoder v3 - 179-image train + lighting augmentation, shadow held out** — results/runs/ae_v3_lightaug_noshadow.json. As the row above without DirectionalShadow in the training pipeline. Local CPU, 1222 s.
   - Experiment 3 arm B, read against A (no pass/fail): unshadowed lighting images 0.957 image-AUROC, but shadowed only 0.457. Robustness to brightness, contrast, gamma and colour does not carry over to a shadow the model never saw. One seed; the shadowed subset has 7 good images, so each one moves its image-AUROC by up to 0.14.
+- **Autoencoder v3 - lighting augmentation, seed 1** — results/runs/ae_v3_lightaug_seed1.json. Arm A with --seed 1; same 179-image split (holdout_seed 0). Local CPU, 1762 s.
+  - Seed replicate of the ACCEPTED row. Lighting shadowed 0.909, unshadowed 0.951.
+- **Autoencoder v3 - lighting augmentation, seed 2** — results/runs/ae_v3_lightaug_seed2.json. Arm A with --seed 2; same split. Local CPU, 1298 s.
+  - Seed replicate of the ACCEPTED row. Lighting shadowed 0.909, unshadowed 0.929.
+- **Autoencoder v3 - lighting augmentation without shadow + flat-field (REJECTED)** — results/runs/ae_v3_noshadow_flat.json. Experiment 4 arm C: the shadow-held-out row plus flat-field input (sigma 16, floor 0.05, gain 0.4) on every image. Seed 0. Local CPU, 2115 s.
+  - Failed one of four pre-registered bounds: unshadowed image-AUROC 0.846 against a floor of 0.90 (shadowed 0.926, unshadowed 0.846). The shadow it never saw is covered (0.457 -> 0.926), clean held (0.947 / 0.909). The shortfall is about one seed-spread wide (arm A's unshadowed sd is 0.060), so a replicate could pass; recorded as rejected under the rule as written.
+- **Autoencoder v3 - flat-field input only, no augmentation** — results/runs/ae_v3_flat.json. Experiment 4 arm D: the 179-image baseline plus flat-field input, no lighting augmentation. Seed 0. Local CPU, 2250 s.
+  - Diagnostic arm, no bar, and the unexpected result: best clean numbers of any autoencoder row (0.987 image, 0.921 pixel; baseline 0.948 / 0.902). Under lighting, never having seen a lighting change, 0.829 (shadowed 0.863, unshadowed 0.808). One seed: the clean gain is far beyond arm A's clean spread (sd 0.003), but this arm's own spread is unmeasured.
 
 ## How to read the two conditions
 

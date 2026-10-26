@@ -20,6 +20,7 @@ from defectloc.config import Config
 from defectloc.data import TrainGood
 from defectloc.losses import recon_loss
 from defectloc.model import ConvAutoencoder
+from defectloc.preprocess import prepare
 
 
 def set_seed(seed: int) -> None:
@@ -81,7 +82,8 @@ def train(root, cfg: Config, device: torch.device, log_every: int = 10, verbose:
         lighting = build_factory_lighting(seed=cfg.train_lighting_seed,
                                           shadow=cfg.train_lighting_shadow)
     ds = TrainGood(root, img_size=cfg.img_size, holdout=cfg.calib_holdout, seed=cfg.seed,
-                   lighting=lighting, lighting_p=cfg.train_lighting_p)
+                   lighting=lighting, lighting_p=cfg.train_lighting_p,
+                   split_seed=cfg.holdout_seed)
     loader = DataLoader(
         ds,
         batch_size=cfg.batch_size,
@@ -97,7 +99,7 @@ def train(root, cfg: Config, device: torch.device, log_every: int = 10, verbose:
     for ep in range(cfg.epochs):
         total, nb = 0.0, 0
         for x in loader:
-            x = x.to(device)
+            x = prepare(x.to(device), cfg)
             # Denoising objective: reconstruct the CLEAN image from a noised
             # input. Another brake on the identity shortcut -- copying the
             # input through now reproduces the noise too, and is punished.
@@ -161,6 +163,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-train-shadow", action="store_true",
                    help="leave DirectionalShadow out of the training lighting pipeline")
     p.add_argument("--train-lighting-seed", type=int, default=d.train_lighting_seed)
+    p.add_argument("--flatfield-sigma", type=float, default=d.flatfield_sigma,
+                   help="Experiment 4: flat-field every model input with this blur width (0 = off)")
     p.add_argument("--num-workers", type=int, default=d.num_workers)
     p.add_argument("--log-every", type=int, default=10, help="print loss every N epochs")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
@@ -182,6 +186,7 @@ def main(argv=None) -> int:
         train_lighting_p=args.train_lighting_p,
         train_lighting_shadow=not args.no_train_shadow,
         train_lighting_seed=args.train_lighting_seed,
+        flatfield_sigma=args.flatfield_sigma,
     )
     device = pick_device(args.device)
     print(f"device: {device}  |  config: {json.dumps(cfg.to_dict())}", flush=True)
@@ -190,7 +195,8 @@ def main(argv=None) -> int:
     model, history = train(args.data_root, cfg, device, log_every=args.log_every)
     elapsed = time.time() - t0
 
-    held = TrainGood(args.data_root, cfg.img_size, cfg.calib_holdout, cfg.seed, part="holdout")
+    held = TrainGood(args.data_root, cfg.img_size, cfg.calib_holdout, part="holdout",
+                     split_seed=cfg.holdout_seed)
     out = save_checkpoint(
         args.out, model, cfg, history,
         extra={"data_root": str(args.data_root), "train_seconds": round(elapsed, 1),

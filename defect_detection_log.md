@@ -255,14 +255,46 @@ moves that subset's image-AUROC by up to 0.14.
 
 ---
 
+## 6d. Seed spread, and Experiment 4 — flat-field input (2026-10-26)
+
+**Seed spread first.** Arm A re-run on seeds 1 and 2 (same split; `holdout_seed` now decouples the
+split from `--seed`). Lighting image-AUROC 0.802 / 0.937 / 0.921 = **0.887 ± 0.074**; clean image
+0.938 ± 0.003. Seed 0 was the worst run. Lighting numbers swing about 0.14 across seeds, clean about
+0.005. I had assumed about 0.05 for lighting, and that was wrong.
+
+**Experiment 4 hypothesis.** A shadow is a smooth multiplicative gradient; dividing the input by its
+own heavy blur (σ 16 px, floor 0.05, gain 0.4, fixed from training images) cancels it without the model
+having seen one. A check on training images before measuring: flat-fielding removes ~90% of a pure
+shadow's effect and none of the full pipeline's (brightness offsets, contrast, gamma are not
+multiplicative). Arms: C = arm B (no shadow in training) + flat-field, with a four-part bar; D =
+baseline + flat-field, diagnostic.
+
+**Result (seed 0):**
+
+| | Clean image | Clean pixel | Lighting image | Shadowed | Unshadowed |
+|---|---|---|---|---|---|
+| B | 0.948 | 0.889 | 0.783 | 0.457 | 0.957 |
+| C | 0.947 | 0.909 | 0.860 | **0.926** | 0.846 |
+| D | **0.987** | **0.921** | 0.829 | 0.863 | 0.808 |
+
+**C rejected:** it covers the unseen shadow (0.457 → 0.926) and holds clean, but unshadowed fell to
+0.846 against a 0.90 floor: flat-fielding amplifies the non-multiplicative changes, as the check
+warned, by more than the bar allowed. The shortfall is about one seed-spread wide, so it is a
+candidate for replication, not a bar to move.
+
+**D unexpected:** flat-field alone, with no augmentation, gave the best clean numbers so far
+(0.987 / 0.921, against 0.948 / 0.902 without it), and 0.829 under lighting without seeing any.
+The figure suggests the lifted interior texture and the uniform background both help the
+reconstruction. One unreplicated run: replicate before it goes in a headline.
+
+---
+
 ## 7. Remaining improvement ladder (planned)
 
-1. **Robustness to unseen lighting** — B shows the model only handles perturbations it was trained on.
-   Candidates: a broader photometric family, or flat-fielding the input against its own low-frequency
-   illumination before the model sees it. Judge on a held-out perturbation, as B does. Re-run A on two
-   more seeds first.
-   *(Fix 2b and Fix 2c, both scoring fixes, were rejected; lighting-augmented training was accepted.
-   See sections 6, 6b and 6c.)*
+1. **Replicate D, then C, on seeds 1 and 2.** If D's clean gain holds, flat-field becomes the
+   default input. Then arm A + flat-field, judged on three seeds from the start.
+   *(Fix 2b and Fix 2c, both scoring fixes, were rejected; lighting-augmented training was accepted;
+   flat-field arm C was rejected and arm D awaits replication. See sections 6–6d.)*
 2. **Masking-based denoising** — replace additive noise with random patch-masking/inpainting; erases defects more completely, reduces residual false-firing. (Requires retraining.)
 3. **Synthetic defects (DRAEM-style)** — paste fake defect-shaped corruptions on normal images for self-supervised, mask-supervised training. Most likely to push past ~0.95 and lift pixel-F1.
 4. **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start *matching* PatchCore.
@@ -285,5 +317,8 @@ moves that subset's image-AUROC by up to 0.14.
 - **An average can hide an inverted subset.** Lighting pixel-AUROC looked healthy for three versions
   and justified two scoring fixes. Splitting by the one perturbation that broke reconstruction showed
   an inverted ranking underneath. Split before diagnosing.
+- **Measure the noise before comparing arms.** One seed of lighting-augmented training read 0.802,
+  and three read 0.887 ± 0.074. Every single-seed lighting comparison in this log is within that
+  band unless the gap is several tenths.
 - **"Nuisance" is a claim about where defects are not.** The rim looked like nuisance in the maps, but
   it is where breakage happens. Break results down by defect type before calling a region noise.

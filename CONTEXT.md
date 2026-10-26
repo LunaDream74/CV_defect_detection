@@ -42,6 +42,9 @@ The notebook has been refactored into a runnable package. This folder is a git r
 | ↳ + per-pixel z, matched calibration (rejected) | 0.958 | 0.869 | 0.569 | 0.650 |
 | **Autoencoder v3 + lighting-augmented training (accepted)** | 0.937 | 0.898 | **0.802** | **0.839** |
 | ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
+| ↳ lighting augmentation, mean of 3 seeds | 0.938 | 0.887 | **0.887** | 0.850 |
+| ↳ shadow held out + flat-field (rejected) | 0.947 | 0.909 | 0.860 | 0.867 |
+| Autoencoder v3 + flat-field only (1 seed) | **0.987** | **0.921** | 0.829 | 0.834 |
 
 Chance AUROC is 0.500. Built from scratch: v1 0.700 → v2 0.741 (tighter bottleneck + denoising,
 killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retraining).
@@ -80,11 +83,16 @@ robustness is coverage of what was trained on, not general.
 ## Status
 
 Refactor done and validated by a reproduction run (re-confirmed on local data 2026-10-26). Fix 2b and
-Fix 2c (scoring) rejected; Experiment 3 (lighting-augmented training) accepted. Next: re-run arm A on
-two more seeds, then robustness to *unseen* lighting, judged on a held-out perturbation as arm B is
-(README § Roadmap). Fix 2c (`7ffe4c4`) and Experiment 3 are committed and pushed to `origin/main` (2026-10-26).
-Checkpoints `ae_v3_lightaug*.pt` are local only (gitignored). No stage
-folders: the pipeline is a package with a CLI, not a staged workflow.
+Fix 2c (scoring) rejected; Experiment 3 (lighting-augmented training) accepted, three seeds: lighting
+image-AUROC 0.887 ± 0.074. Experiment 4 (flat-field input): arm C rejected on its unshadowed floor
+(0.846 < 0.90) though it covers the unseen shadow (0.926); arm D (flat-field only) gave the best clean
+numbers so far (0.987 / 0.921), **one seed, unreplicated**. Lighting numbers swing ~0.14 across seeds.
+
+Next (README § Roadmap): replicate D, then C, on seeds 1 and 2 (`--flatfield-sigma 16 --seed N`,
+~37 min each on CPU; a stopped run starts over). If D holds, flat-field becomes the default input; then
+arm A + flat-field on three seeds. Fix 2c (`7ffe4c4`), Experiment 3 (`e7fc758`), the seed
+replicates and Experiment 4 are all committed and pushed to `origin/main` (2026-10-26). Checkpoints are local only (gitignored).
+No stage folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints
 

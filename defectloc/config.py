@@ -37,12 +37,18 @@ class Config:
 
     # --- Fix 2c: per-pixel calibration on held-out normals ---
     calib_holdout: int = 0        # train/good images withheld from training (0 = none)
+    holdout_seed: int = 0         # seeds the split only, so --seed varies training alone
     calib_copies: int = 4         # lighting-stressed copies of each held-out image
 
     # --- Experiment 3: lighting-augmented training ---
     train_lighting_p: float = 0.0     # per-sample probability of the lighting pipeline
     train_lighting_shadow: bool = True  # include DirectionalShadow in that pipeline
     train_lighting_seed: int = 2      # test set uses 0, calibration 1
+
+    # --- Experiment 4: flat-field input (defectloc/preprocess.py) ---
+    flatfield_sigma: float = 0.0  # blur width in px at img_size (0 = off)
+    flatfield_floor: float = 0.05
+    flatfield_gain: float = 0.4
 
     # --- reproducibility ---
     seed: int = 0
