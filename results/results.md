@@ -22,7 +22,9 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 | Autoencoder v3 - lighting augmentation, seed 1 | 0.936 | **0.877** | 0.937 | 0.858 | local-run |
 | Autoencoder v3 - lighting augmentation, seed 2 | 0.940 | **0.885** | 0.921 | 0.854 | local-run |
 | Autoencoder v3 - lighting augmentation without shadow + flat-field (REJECTED) | 0.947 | **0.909** | 0.860 | 0.867 | local-run |
-| Autoencoder v3 - flat-field input only, no augmentation | 0.987 | **0.921** | 0.829 | 0.834 | local-run |
+| Autoencoder v3 - flat-field input only, no augmentation (ACCEPTED as default) | 0.987 | **0.921** | 0.829 | 0.834 | local-run |
+| Autoencoder v3 - flat-field input only, seed 1 | 0.986 | **0.920** | 0.801 | 0.838 | local-run |
+| Autoencoder v3 - flat-field input only, seed 2 | 0.992 | **0.923** | 0.823 | 0.840 | local-run |
 
 ## Provenance
 
@@ -54,8 +56,12 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
   - Seed replicate of the ACCEPTED row. Lighting shadowed 0.909, unshadowed 0.929.
 - **Autoencoder v3 - lighting augmentation without shadow + flat-field (REJECTED)** — results/runs/ae_v3_noshadow_flat.json. Experiment 4 arm C: the shadow-held-out row plus flat-field input (sigma 16, floor 0.05, gain 0.4) on every image. Seed 0. Local CPU, 2115 s.
   - Failed one of four pre-registered bounds: unshadowed image-AUROC 0.846 against a floor of 0.90 (shadowed 0.926, unshadowed 0.846). The shadow it never saw is covered (0.457 -> 0.926), clean held (0.947 / 0.909). The shortfall is about one seed-spread wide (arm A's unshadowed sd is 0.060), so a replicate could pass; recorded as rejected under the rule as written.
-- **Autoencoder v3 - flat-field input only, no augmentation** — results/runs/ae_v3_flat.json. Experiment 4 arm D: the 179-image baseline plus flat-field input, no lighting augmentation. Seed 0. Local CPU, 2250 s.
-  - Diagnostic arm, no bar, and the unexpected result: best clean numbers of any autoencoder row (0.987 image, 0.921 pixel; baseline 0.948 / 0.902). Under lighting, never having seen a lighting change, 0.829 (shadowed 0.863, unshadowed 0.808). One seed: the clean gain is far beyond arm A's clean spread (sd 0.003), but this arm's own spread is unmeasured.
+- **Autoencoder v3 - flat-field input only, no augmentation (ACCEPTED as default)** — results/runs/ae_v3_flat.json. Experiment 4 arm D: the 179-image baseline plus flat-field input, no lighting augmentation. Seed 0. Local CPU, 2250 s.
+  - Diagnostic arm, no bar, and the unexpected result: best clean numbers of any autoencoder row (0.987 image, 0.921 pixel; baseline 0.948 / 0.902). Under lighting, never having seen a lighting change, 0.829 (shadowed 0.863, unshadowed 0.808). One seed: the clean gain is far beyond arm A's clean spread (sd 0.003), but this arm's own spread is unmeasured. REPLICATED: seeds 1 and 2 (rows below) met the criterion written before they ran (both clean image >= 0.968, three-seed mean clean pixel >= 0.912). Three seeds: clean 0.988 +/- 0.004 image, 0.921 +/- 0.001 pixel; lighting 0.818 +/- 0.015, a fifth of arm A's lighting spread. Flat-field is now the default input; checkpoints from before it load with it off.
+- **Autoencoder v3 - flat-field input only, seed 1** — results/runs/ae_v3_flat_seed1.json. Arm D with --seed 1; same 179-image split. Local CPU, 2288 s.
+  - Replicate of arm D. Lighting shadowed 0.863, unshadowed 0.771.
+- **Autoencoder v3 - flat-field input only, seed 2** — results/runs/ae_v3_flat_seed2.json. Arm D with --seed 2; same 179-image split. Local CPU, 3182 s.
+  - Replicate of arm D. Lighting shadowed 0.920, unshadowed 0.787.
 
 ## How to read the two conditions
 

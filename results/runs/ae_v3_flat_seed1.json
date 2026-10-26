@@ -1,0 +1,311 @@
+{
+  "label": "Autoencoder v3, flat-field only, seed 1",
+  "checkpoint": "checkpoints/ae_v3_flat_seed1.pt",
+  "config": {
+    "img_size": 256,
+    "num_workers": 0,
+    "latent_ch": 64,
+    "epochs": 80,
+    "batch_size": 16,
+    "lr": 0.0002,
+    "noise_sigma": 0.1,
+    "loss_alpha": 0.5,
+    "ssim_window": 11,
+    "topk_frac": 0.01,
+    "calib_holdout": 30,
+    "holdout_seed": 0,
+    "calib_copies": 4,
+    "train_lighting_p": 0.0,
+    "train_lighting_shadow": true,
+    "train_lighting_seed": 2,
+    "flatfield_sigma": 16.0,
+    "flatfield_floor": 0.05,
+    "flatfield_gain": 0.4,
+    "seed": 1
+  },
+  "train_seconds": 2288.1,
+  "final_train_loss": 0.07696389000524174,
+  "conditions": {
+    "clean": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.9857142857142857,
+          "pixel_AUROC": 0.9202947187643802,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 1.0,
+              "pixel_AUROC": 0.9334334415954911
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9818181818181818,
+              "pixel_AUROC": 0.9836050672246962
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9761904761904762,
+              "pixel_AUROC": 0.8850389895736748
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.8166666666666667,
+          "pixel_AUROC": 0.8997484543366351,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.7525,
+              "pixel_AUROC": 0.8985171151790308
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9272727272727274,
+              "pixel_AUROC": 0.9753903893918222
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.7619047619047619,
+              "pixel_AUROC": 0.8721238158811659
+            }
+          }
+        },
+        "pixel_z": {
+          "image_AUROC": 0.8912698412698412,
+          "pixel_AUROC": 0.8647319707286907,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.9175,
+              "pixel_AUROC": 0.8381648866858907
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.7795454545454545,
+              "pixel_AUROC": 0.9403944509288102
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9833333333333333,
+              "pixel_AUROC": 0.8872100349468262
+            }
+          }
+        },
+        "pixel_z_cleancal": {
+          "image_AUROC": 0.8912698412698412,
+          "pixel_AUROC": 0.8647319707286907,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.9175,
+              "pixel_AUROC": 0.8381648866858907
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.7795454545454545,
+              "pixel_AUROC": 0.9403944509288102
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9833333333333333,
+              "pixel_AUROC": 0.8872100349468262
+            }
+          }
+        }
+      },
+      "root": "data/MVTecAD/bottle"
+    },
+    "lighting": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.8007936507936508,
+          "pixel_AUROC": 0.837721188918772,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.8625,
+              "pixel_AUROC": 0.8647725349009805
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.7840909090909092,
+              "pixel_AUROC": 0.9362712555987904
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.7595238095238095,
+              "pixel_AUROC": 0.7789960756757771
+            }
+          },
+          "lighting_subsets": {
+            "shadow": {
+              "n": 32,
+              "n_defective": 25,
+              "image_AUROC": 0.8628571428571429,
+              "pixel_AUROC": 0.8333514702460154
+            },
+            "no_shadow": {
+              "n": 51,
+              "n_defective": 38,
+              "image_AUROC": 0.771255060728745,
+              "pixel_AUROC": 0.8427792870229291
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.49603174603174605,
+          "pixel_AUROC": 0.8258013749885045,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.485,
+              "pixel_AUROC": 0.842535182314977
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.6431818181818182,
+              "pixel_AUROC": 0.8966580953203239
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.35238095238095235,
+              "pixel_AUROC": 0.7655752895767314
+            }
+          },
+          "lighting_subsets": {
+            "shadow": {
+              "n": 32,
+              "n_defective": 25,
+              "image_AUROC": 0.4857142857142857,
+              "pixel_AUROC": 0.8243735059228483
+            },
+            "no_shadow": {
+              "n": 51,
+              "n_defective": 38,
+              "image_AUROC": 0.5020242914979757,
+              "pixel_AUROC": 0.8267528385403283
+            }
+          }
+        },
+        "pixel_z": {
+          "image_AUROC": 0.803968253968254,
+          "pixel_AUROC": 0.6800526025664178,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.8875,
+              "pixel_AUROC": 0.716154013055382
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.7431818181818182,
+              "pixel_AUROC": 0.8767435071889172
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.7880952380952381,
+              "pixel_AUROC": 0.5802350529084916
+            }
+          },
+          "lighting_subsets": {
+            "shadow": {
+              "n": 32,
+              "n_defective": 25,
+              "image_AUROC": 0.7657142857142857,
+              "pixel_AUROC": 0.6531931445252103
+            },
+            "no_shadow": {
+              "n": 51,
+              "n_defective": 38,
+              "image_AUROC": 0.8178137651821862,
+              "pixel_AUROC": 0.6998858553758156
+            }
+          }
+        },
+        "pixel_z_cleancal": {
+          "image_AUROC": 0.6388888888888888,
+          "pixel_AUROC": 0.7113210911849621,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.635,
+              "pixel_AUROC": 0.6824769751850606
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5159090909090909,
+              "pixel_AUROC": 0.7874874136812043
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.7714285714285716,
+              "pixel_AUROC": 0.7529493359118073
+            }
+          },
+          "lighting_subsets": {
+            "shadow": {
+              "n": 32,
+              "n_defective": 25,
+              "image_AUROC": 0.64,
+              "pixel_AUROC": 0.7166653784436701
+            },
+            "no_shadow": {
+              "n": 51,
+              "n_defective": 38,
+              "image_AUROC": 0.6437246963562753,
+              "pixel_AUROC": 0.7086271790453023
+            }
+          }
+        }
+      },
+      "root": "data/MVTecAD_lighting/bottle"
+    }
+  },
+  "calibration": {
+    "holdout_files": [
+      "000.png",
+      "006.png",
+      "017.png",
+      "025.png",
+      "041.png",
+      "054.png",
+      "060.png",
+      "065.png",
+      "068.png",
+      "071.png",
+      "080.png",
+      "083.png",
+      "090.png",
+      "091.png",
+      "094.png",
+      "105.png",
+      "112.png",
+      "116.png",
+      "141.png",
+      "152.png",
+      "159.png",
+      "162.png",
+      "163.png",
+      "164.png",
+      "175.png",
+      "178.png",
+      "194.png",
+      "195.png",
+      "200.png",
+      "206.png"
+    ],
+    "clean": {
+      "n_maps": 30,
+      "sigma_floor": 0.017021551728248596
+    },
+    "lighting": {
+      "n_maps": 120,
+      "sigma_floor": 0.15424485504627228
+    }
+  },
+  "lighting_subsets": "results/lighting_subsets.json"
+}

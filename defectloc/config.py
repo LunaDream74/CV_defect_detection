@@ -46,7 +46,10 @@ class Config:
     train_lighting_seed: int = 2      # test set uses 0, calibration 1
 
     # --- Experiment 4: flat-field input (defectloc/preprocess.py) ---
-    flatfield_sigma: float = 0.0  # blur width in px at img_size (0 = off)
+    # On by default since arm D replicated (2026-10-26). Blur width in px at a
+    # 256-px image, scaled with img_size; 0 = off. Checkpoints saved before this
+    # field existed load with it off (train.load_checkpoint), as they were trained.
+    flatfield_sigma: float = 16.0
     flatfield_floor: float = 0.05
     flatfield_gain: float = 0.4
 

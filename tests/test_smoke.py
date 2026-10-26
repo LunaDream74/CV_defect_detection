@@ -404,14 +404,29 @@ def test_flatfield_cancels_a_smooth_multiplicative_gradient_but_keeps_a_local_de
     assert 0.0 <= float(flat.min()) and float(flat.max()) <= 1.0
 
 
-def test_flatfield_is_off_by_default_and_rejects_a_kernel_larger_than_the_image():
+def test_flatfield_is_on_by_default_scales_with_size_and_rejects_an_oversized_kernel():
     from defectloc.preprocess import flatfield, prepare
 
-    x = torch.rand(1, 3, 32, 32)
-    assert torch.equal(prepare(x, Config()), x)
-    assert not torch.equal(prepare(x, Config(flatfield_sigma=2.0)), x)
+    x = torch.rand(1, 3, 64, 64)
+    assert not torch.equal(prepare(x, Config(img_size=64)), x), "on by default"
+    assert torch.equal(prepare(x, Config(img_size=64, flatfield_sigma=0.0)), x), "0 = off"
+    # sigma 16 at 256 px is sigma 4 at 64 px
+    assert torch.allclose(prepare(x, Config(img_size=64)), flatfield(x, sigma=4.0))
     with pytest.raises(ValueError):
         flatfield(x, sigma=16.0)
+
+
+def test_checkpoints_from_before_flatfield_load_with_it_off(tmp_path):
+    """Flipping the default must not silently flat-field old checkpoints."""
+    from defectloc.train import load_checkpoint
+
+    cfg = Config(img_size=64)
+    legacy = {k: v for k, v in cfg.to_dict().items() if k != "flatfield_sigma"}
+    path = tmp_path / "old.pt"
+    torch.save({"state_dict": ConvAutoencoder(latent_ch=cfg.latent_ch).state_dict(),
+                "config": legacy}, path)
+    _, loaded, _ = load_checkpoint(path, torch.device("cpu"))
+    assert loaded.flatfield_sigma == 0.0
 
 
 def test_reconstruction_is_deterministic_given_a_seed(fixture_root):

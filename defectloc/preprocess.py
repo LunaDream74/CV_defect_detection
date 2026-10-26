@@ -38,11 +38,14 @@ def flatfield(x: torch.Tensor, sigma: float = 16.0, floor: float = 0.05,
 
 
 def prepare(x: torch.Tensor, cfg: Config) -> torch.Tensor:
-    """The model's input transform: identity unless ``cfg.flatfield_sigma`` > 0.
+    """The model's input transform: flat-field unless ``cfg.flatfield_sigma`` is 0.
 
     Applied to every image the model sees -- training, test, calibration and
-    figures -- so the anomaly map compares like with like.
+    figures -- so the anomaly map compares like with like. ``flatfield_sigma``
+    is in pixels at a 256-px image and scales with ``cfg.img_size``, so the
+    blur covers the same fraction of the frame at any resolution.
     """
     if cfg.flatfield_sigma <= 0:
         return x
-    return flatfield(x, cfg.flatfield_sigma, cfg.flatfield_floor, cfg.flatfield_gain)
+    sigma = cfg.flatfield_sigma * cfg.img_size / 256
+    return flatfield(x, sigma, cfg.flatfield_floor, cfg.flatfield_gain)

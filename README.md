@@ -25,15 +25,15 @@ Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" str
 | ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
 | ↳ lighting augmentation, mean of 3 seeds | 0.938 | 0.887 | **0.887** | 0.850 |
 | ↳ shadow held out + flat-field input (rejected) | 0.947 | 0.909 | 0.860 | 0.867 |
-| Autoencoder v3 + flat-field input only (1 seed, unreplicated) | **0.987** | **0.921** | 0.829 | 0.834 |
+| **Autoencoder v3 + flat-field input (default), mean of 3 seeds** | **0.988** | **0.921** | 0.818 | 0.837 |
 
-The autoencoder reaches a clean pixel-AUROC of **0.908** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
+With flat-field input, now the default, the autoencoder reaches clean image-AUROC **0.988** and pixel-AUROC **0.921** from scratch (three seeds, sd ≤ 0.004), against PatchCore's 1.000 / 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
 
 The re-run reproduces the notebook within run-to-run spread (clean 0.937/0.894 → 0.936/0.908, lighting 0.512/0.715 → 0.551/0.720). That agreement is the evidence that the refactor preserved the numerics, and it is why the two v3 rows are both kept rather than one overwriting the other.
 
 Every number and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`.
 
-> **The lighting failure was representation, and training under varied lighting closes most of it.** Under the stress test, image-AUROC sat near chance (0.551) while pixel-AUROC looked healthy (0.720), which was read as a scoring problem. Two scoring fixes built on that reading failed ([Fix 2b](#fix-2b-what-happened), [Fix 2c](#fix-2c-what-happened)). Splitting the lighting set by the replayed shadow labels showed the ranking was *inverted* on shadowed frames, where the reconstruction collapses. Lighting-augmented training lifts lighting image-AUROC from 0.573 to 0.887 ± 0.074 over three seeds, at a cost of about 0.01 clean ([Experiment 3](#experiment-3-what-happened)). That gain covers only the perturbations the model trained on. Flat-fielding the input covers a shadow the model never saw, but costs the other perturbations ([Experiment 4](#experiment-4-what-happened)). Flat-fielding on its own also gave the best clean numbers so far (0.987 / 0.921), from a single unreplicated run.
+> **The lighting failure was representation, and training under varied lighting closes most of it.** Under the stress test, image-AUROC sat near chance (0.551) while pixel-AUROC looked healthy (0.720), which was read as a scoring problem. Two scoring fixes built on that reading failed ([Fix 2b](#fix-2b-what-happened), [Fix 2c](#fix-2c-what-happened)). Splitting the lighting set by the replayed shadow labels showed the ranking was *inverted* on shadowed frames, where the reconstruction collapses. Lighting-augmented training lifts lighting image-AUROC from 0.573 to 0.887 ± 0.074 over three seeds, at a cost of about 0.01 clean ([Experiment 3](#experiment-3-what-happened)). That gain covers only the perturbations the model trained on. Flat-fielding the input covers a shadow the model never saw, but costs the other perturbations ([Experiment 4](#experiment-4-what-happened)). Flat-fielding on its own, with no augmentation, gave the best clean numbers so far (0.988 / 0.921 over three seeds) and steadier lighting numbers (0.818 ± 0.015). It is now the default input.
 
 ---
 
@@ -276,6 +276,27 @@ D has no pass/fail.
 
 What is kept: `defectloc/preprocess.py` (off by default) and both checkpoints' run files.
 
+### Replicating arm D
+
+*Criterion written 2026-10-26, before seeds 1 and 2 were trained.*
+
+D's clean gain holds if **both** replicates reach clean image-AUROC ≥ 0.968, half the observed +0.039 over the 0.948 baseline, **and** the three-seed mean clean pixel-AUROC is ≥ 0.912, half the observed +0.019 over 0.902. If it holds, flat-field becomes the default input. Lighting numbers are reported with their spread, but they are not part of the criterion: arm A showed a single lighting run can sit 0.14 from its neighbours.
+
+**It held.** ([`ae_v3_flat_seed1.json`](results/runs/ae_v3_flat_seed1.json), [`_seed2.json`](results/runs/ae_v3_flat_seed2.json))
+
+| Arm D | Clean image | Clean pixel | Lighting image | Shadowed | Unshadowed |
+|---|:---:|:---:|:---:|:---:|:---:|
+| seed 0 | 0.987 | 0.921 | 0.829 | 0.863 | 0.808 |
+| seed 1 | 0.986 | 0.920 | 0.801 | 0.863 | 0.771 |
+| seed 2 | 0.992 | 0.923 | 0.823 | 0.920 | 0.787 |
+| **mean ± sd** | **0.988 ± 0.004** | **0.921 ± 0.001** | 0.818 ± 0.015 | 0.882 ± 0.033 | 0.789 ± 0.018 |
+
+Both replicates clear 0.968 by about 0.02, and the mean clean pixel clears 0.912 by 0.009. Seed 2's maps show the same pattern as seed 0's, centre swirl included. One thing the criterion did not ask about: D's lighting spread (0.015) is a fifth of arm A's (0.074). Flat-fielding seems to stabilise training as well as improve it.
+
+Flat-field is now the default input (`flatfield_sigma = 16`, in pixels at 256 and scaled with image size). Checkpoints saved before the field existed load with it off, as they were trained. Re-evaluating three of them, one of each kind (from before the field, stored off, stored on), reproduced every recorded number exactly. To reproduce any row from before Experiment 4, train with `--flatfield-sigma 0`.
+
+The comparison has one weak side. D's three seeds are compared with a no-flat-field baseline measured on one seed (0.948 / 0.902). Arm A's clean spread (sd 0.003) suggests that baseline is not far off, but its own spread is unmeasured.
+
 ---
 
 ## Architecture
@@ -308,7 +329,7 @@ defectloc/            the pipeline
   augment.py          the factory-lighting pipeline (seeded; shadow optional)
   anomaly.py          local-SSIM map, top-k score, median/MAD normalization
   calibrate.py        Fix 2c: per-pixel statistics of held-out normal maps, z map
-  preprocess.py       Experiment 4: flat-field input (off by default)
+  preprocess.py       Experiment 4: flat-field input (on by default)
   train.py            training + checkpoint I/O
   evaluate.py         image/pixel AUROC, every scoring variant, per-defect-type, shadow subsets
   visualize.py        input / reconstruction / map / ground-truth figures
@@ -318,7 +339,7 @@ scripts/
   patchcore_baseline.py   re-run the PatchCore reference row (optional, heavy)
   make_synthetic_fixture.py  tiny procedural dataset for smoke tests
   label_lighting_subsets.py  replay the lighting build, label shadowed test images
-tests/test_smoke.py   25 plumbing and invariant tests, no GPU or dataset needed
+tests/test_smoke.py   26 plumbing and invariant tests, no GPU or dataset needed
 results/              history.json (recorded, with provenance) + generated results.md
 ```
 
@@ -340,7 +361,7 @@ python scripts/prepare_data.py --kagglehub
 
 That writes `data/MVTecAD/bottle` (clean) and `data/MVTecAD_lighting/bottle` (stress-tested test split, masks and train split unchanged). The lighting set is seeded, so it is the same set of images on every run.
 
-Train, then evaluate:
+Train, then evaluate. Training uses flat-field input by default (Experiment 4); every row from before it was trained with `--flatfield-sigma 0`, which the Fix 2c and Experiment 3 commands below include.
 
 ```bash
 python -m defectloc.train --data-root data/MVTecAD/bottle --epochs 80
@@ -374,7 +395,7 @@ Fix 2c needs a checkpoint trained with held-out normals. `evaluate` then adds th
 
 ```bash
 python -m defectloc.train --data-root data/MVTecAD/bottle --calib-holdout 30 \
-    --out checkpoints/ae_v3_holdout30.pt
+    --flatfield-sigma 0 --out checkpoints/ae_v3_holdout30.pt
 
 python -m defectloc.visualize --checkpoint checkpoints/ae_v3_holdout30.pt \
     --data-root data/MVTecAD_lighting/bottle --train-root data/MVTecAD/bottle \
@@ -388,7 +409,7 @@ python scripts/label_lighting_subsets.py \
     --clean-root data/MVTecAD/bottle --lighting-root data/MVTecAD_lighting/bottle
 
 python -m defectloc.train --data-root data/MVTecAD/bottle --calib-holdout 30 \
-    --train-lighting-p 0.5 --out checkpoints/ae_v3_lightaug.pt
+    --train-lighting-p 0.5 --flatfield-sigma 0 --out checkpoints/ae_v3_lightaug.pt
 
 python -m defectloc.evaluate --checkpoint checkpoints/ae_v3_lightaug.pt \
     --clean-root data/MVTecAD/bottle --lighting-root data/MVTecAD_lighting/bottle \
@@ -397,7 +418,7 @@ python -m defectloc.evaluate --checkpoint checkpoints/ae_v3_lightaug.pt \
 
 On this laptop's CPU, arm A took 27 minutes and arm B 20.
 
-Experiment 4 adds flat-field input with `--flatfield-sigma 16` (stored in the checkpoint, so `evaluate` and `visualize` apply it on their own). Arm C adds `--train-lighting-p 0.5 --no-train-shadow`; arm D uses the flag alone. Each took 35–38 minutes on CPU. `--seed N` varies training only; the calibration split is fixed by `holdout_seed` (default 0).
+Experiment 4 adds flat-field input with `--flatfield-sigma 16`, now the default (stored in the checkpoint, so `evaluate` and `visualize` apply it on their own). Arm C adds `--train-lighting-p 0.5 --no-train-shadow`; arm D uses the flag alone. Each took 35–38 minutes on CPU. `--seed N` varies training only; the calibration split is fixed by `holdout_seed` (default 0).
 
 ### Reproducing the table
 
@@ -439,7 +460,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -q
 ```
 
-25 tests, about 20 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
+26 tests, about 20 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
 
 ### PatchCore baseline (optional)
 
@@ -470,8 +491,10 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 - [x] **Lighting-augmented training.** Measured and **accepted**: lighting image-AUROC 0.573 → 0.802, clean −0.011. The shadowed subset went from inverted (0.269) to 0.740. Holding the shadow out of training (arm B) leaves it at 0.457. See [Experiment 3: what happened](#experiment-3-what-happened).
 - [x] **Seed spread for arm A.** Three seeds: lighting image-AUROC 0.887 ± 0.074; seed 0 was the lowest. Lighting numbers swing by about 0.14 across seeds, clean by about 0.005.
 - [x] **Flat-field input (Experiment 4).** Arm C (no shadow in training + flat-field) covers the unseen shadow (0.457 → 0.926) but fails its unshadowed floor (0.846 < 0.90): **rejected**. Arm D (flat-field only) gave the best clean numbers so far (0.987 / 0.921), unreplicated. See [Experiment 4: what happened](#experiment-4-what-happened).
-- [ ] **Replicate D and C** on seeds 1 and 2 before either goes in a headline. D first: if its clean gain holds, flat-field becomes the default input.
-- [ ] **Flat-field + full lighting augmentation** (arm A + flat-field), judged on three seeds from the start.
+- [x] **Replicate D.** Held on its pre-set criterion: clean 0.988 ± 0.004 / 0.921 ± 0.001 over three seeds. Flat-field is now the default input.
+- [ ] **Flat-field + full lighting augmentation** (arm A + flat-field), judged on three seeds from the start. The question: can it keep D's clean numbers and reach arm A's lighting numbers?
+- [ ] **Replicate C** on seeds 1 and 2. Its unshadowed shortfall was about one seed-spread wide.
+- [ ] **Baseline seed spread.** Re-run the no-flat-field baseline on seeds 1 and 2, so D's gain is measured against a mean, not one run.
 - [ ] **Masking-based denoising** — replace additive noise with random patch masking/inpainting to erase defects more completely and reduce false-firing.
 - [ ] **Synthetic defects (DRAEM-style)** — paste defect-shaped corruptions on normal images for self-supervised, mask-supervised training; expected to push past ~0.95 and improve pixel-F1.
 - [ ] **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start matching memory-bank methods like PatchCore.

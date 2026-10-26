@@ -137,7 +137,11 @@ def save_checkpoint(path, model, cfg: Config, history, extra=None) -> Path:
 def load_checkpoint(path, device: torch.device):
     """Rebuild a model from a checkpoint, using the config stored inside it."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
-    cfg = Config(**ckpt["config"])
+    # Fields added after a checkpoint was saved take the value it was trained
+    # with, not today's default. Flat-field became the default in Experiment 4;
+    # every earlier checkpoint was trained on raw input.
+    legacy = {"flatfield_sigma": 0.0}
+    cfg = Config(**{**legacy, **ckpt["config"]})
     model = ConvAutoencoder(latent_ch=cfg.latent_ch).to(device)
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
@@ -164,7 +168,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="leave DirectionalShadow out of the training lighting pipeline")
     p.add_argument("--train-lighting-seed", type=int, default=d.train_lighting_seed)
     p.add_argument("--flatfield-sigma", type=float, default=d.flatfield_sigma,
-                   help="Experiment 4: flat-field every model input with this blur width (0 = off)")
+                   help="flat-field blur width in px at 256 (default on since Experiment 4; 0 = off, "
+                        "which reproduces every row from before it)")
     p.add_argument("--num-workers", type=int, default=d.num_workers)
     p.add_argument("--log-every", type=int, default=10, help="print loss every N epochs")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])

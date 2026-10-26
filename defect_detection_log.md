@@ -287,14 +287,21 @@ candidate for replication, not a bar to move.
 The figure suggests the lifted interior texture and the uniform background both help the
 reconstruction. One unreplicated run: replicate before it goes in a headline.
 
+**D replicated (same day).** Criterion written before seeds 1 and 2 ran: both clean image ≥ 0.968 and
+three-seed mean clean pixel ≥ 0.912. Result: 0.987 / 0.986 / 0.992 image, 0.921 / 0.920 / 0.923 pixel
+→ **0.988 ± 0.004 / 0.921 ± 0.001**. Held. Lighting 0.818 ± 0.015, a fifth of arm A's spread.
+Flat-field is now the default input. Checkpoints from before the field existed load with it off; three
+re-evaluated checkpoints (one of each kind) reproduced every recorded number exactly. Weak side: the
+no-flat-field baseline it beats is one seed.
+
 ---
 
 ## 7. Remaining improvement ladder (planned)
 
-1. **Replicate D, then C, on seeds 1 and 2.** If D's clean gain holds, flat-field becomes the
-   default input. Then arm A + flat-field, judged on three seeds from the start.
+1. **Arm A + flat-field** (now the default), judged on three seeds from the start: can it keep D's
+   clean numbers and reach arm A's lighting? Also replicate C, and measure the baseline's own spread.
    *(Fix 2b and Fix 2c, both scoring fixes, were rejected; lighting-augmented training was accepted;
-   flat-field arm C was rejected and arm D awaits replication. See sections 6–6d.)*
+   flat-field arm C was rejected; arm D replicated and flat-field is now the default. See sections 6–6d.)*
 2. **Masking-based denoising** — replace additive noise with random patch-masking/inpainting; erases defects more completely, reduces residual false-firing. (Requires retraining.)
 3. **Synthetic defects (DRAEM-style)** — paste fake defect-shaped corruptions on normal images for self-supervised, mask-supervised training. Most likely to push past ~0.95 and lift pixel-F1.
 4. **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start *matching* PatchCore.

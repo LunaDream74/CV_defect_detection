@@ -44,7 +44,7 @@ The notebook has been refactored into a runnable package. This folder is a git r
 | ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
 | ↳ lighting augmentation, mean of 3 seeds | 0.938 | 0.887 | **0.887** | 0.850 |
 | ↳ shadow held out + flat-field (rejected) | 0.947 | 0.909 | 0.860 | 0.867 |
-| Autoencoder v3 + flat-field only (1 seed) | **0.987** | **0.921** | 0.829 | 0.834 |
+| **Autoencoder v3 + flat-field input (default), 3 seeds** | **0.988** | **0.921** | 0.818 | 0.837 |
 
 Chance AUROC is 0.500. Built from scratch: v1 0.700 → v2 0.741 (tighter bottleneck + denoising,
 killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retraining).
@@ -84,14 +84,15 @@ robustness is coverage of what was trained on, not general.
 
 Refactor done and validated by a reproduction run (re-confirmed on local data 2026-10-26). Fix 2b and
 Fix 2c (scoring) rejected; Experiment 3 (lighting-augmented training) accepted, three seeds: lighting
-image-AUROC 0.887 ± 0.074. Experiment 4 (flat-field input): arm C rejected on its unshadowed floor
-(0.846 < 0.90) though it covers the unseen shadow (0.926); arm D (flat-field only) gave the best clean
-numbers so far (0.987 / 0.921), **one seed, unreplicated**. Lighting numbers swing ~0.14 across seeds.
+image-AUROC 0.887 ± 0.074. Experiment 4 (flat-field input): arm C rejected on its unshadowed floor;
+**arm D (flat-field only) replicated on three seeds, clean 0.988 / 0.921, and flat-field is now the
+default input** (`flatfield_sigma = 16`). Checkpoints from before it load with it off; reproduce any
+earlier row with `--flatfield-sigma 0`.
 
-Next (README § Roadmap): replicate D, then C, on seeds 1 and 2 (`--flatfield-sigma 16 --seed N`,
-~37 min each on CPU; a stopped run starts over). If D holds, flat-field becomes the default input; then
-arm A + flat-field on three seeds. Fix 2c (`7ffe4c4`), Experiment 3 (`e7fc758`), the seed
-replicates and Experiment 4 are all committed and pushed to `origin/main` (2026-10-26). Checkpoints are local only (gitignored).
+Next (README § Roadmap): arm A + flat-field on three seeds (`--train-lighting-p 0.5 --seed N`, flat-field
+is on by default; ~37 min each on CPU, a stopped run starts over). Also replicate C, and measure the
+no-flat-field baseline's seed spread. Everything through the D replicates and the default change is
+committed and pushed to `origin/main` (2026-10-26). Checkpoints are local only (gitignored).
 No stage folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints
