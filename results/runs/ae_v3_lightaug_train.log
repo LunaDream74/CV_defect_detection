@@ -1,0 +1,12 @@
+device: cpu  |  config: {"img_size": 256, "num_workers": 0, "latent_ch": 64, "epochs": 80, "batch_size": 16, "lr": 0.0002, "noise_sigma": 0.1, "loss_alpha": 0.5, "ssim_window": 11, "topk_frac": 0.01, "calib_holdout": 30, "calib_copies": 4, "train_lighting_p": 0.5, "train_lighting_shadow": true, "train_lighting_seed": 2, "seed": 0}
+epoch   1/80  loss 0.4186
+epoch  10/80  loss 0.3241
+epoch  20/80  loss 0.2158
+epoch  30/80  loss 0.1243
+epoch  40/80  loss 0.1110
+epoch  50/80  loss 0.0981
+epoch  60/80  loss 0.0907
+epoch  70/80  loss 0.0867
+epoch  80/80  loss 0.0885
+
+trained in 1619.5s  ->  checkpoints\ae_v3_lightaug.pt

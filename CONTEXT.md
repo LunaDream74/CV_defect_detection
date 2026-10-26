@@ -40,6 +40,8 @@ The notebook has been refactored into a runnable package. This folder is a git r
 | Autoencoder v3 + median/MAD score (rejected) | 0.642 | 0.885 | 0.451 | 0.728 |
 | Autoencoder v3, 179-image train (30 held out) | 0.948 | 0.902 | 0.573 | 0.728 |
 | ↳ + per-pixel z, matched calibration (rejected) | 0.958 | 0.869 | 0.569 | 0.650 |
+| **Autoencoder v3 + lighting-augmented training (accepted)** | 0.937 | 0.898 | **0.802** | **0.839** |
+| ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
 
 Chance AUROC is 0.500. Built from scratch: v1 0.700 → v2 0.741 (tighter bottleneck + denoising,
 killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retraining).
@@ -47,11 +49,12 @@ killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retrainin
 The post-refactor re-run reproduces the notebook within run-to-run spread, which is the evidence
 that the refactor preserved the numerics.
 
-## The open issue, stated precisely
+## The lighting issue, and how the diagnosis changed
 
-Under the lighting stress test, pixel-AUROC holds at 0.720 but image-AUROC sits near chance (0.551).
-This is **score normalisation, not representation**: a global lighting shift moves each image's error
-baseline by a different amount, so per-image scores stop being comparable.
+Under the lighting stress test, pixel-AUROC held at 0.720 but image-AUROC sat near chance (0.551).
+This was read as **score normalisation, not representation**: a global lighting shift moves each
+image's error baseline by a different amount, so per-image scores stop being comparable. Two scoring
+fixes were built on that reading, then Experiment 3 showed the reading was wrong. History in order:
 
 **The first fix was measured and rejected.** Per-image median/MAD normalisation
 (`defectloc/anomaly.py::normalize_map`) made image-AUROC *worse* in both conditions: clean
@@ -67,15 +70,20 @@ held-out normal images, moved lighting image-AUROC 0.573 → 0.569 against a pre
 breakage (broken_large 0.927 → 0.800), because bottles break at the rim the calibration discounts.
 Under lighting the normal spread is ~16× the clean spread, so the calibration has nothing to grip.
 
-Fix 2c also showed a shadowed frame whose reconstruction collapses outright, so the "score, not
-representation" diagnosis is now in question.
+**The diagnosis itself was wrong (Experiment 3, 2026-10-26).** Replaying the lighting build to label
+shadowed frames showed lighting image-AUROC was *inverted* on them (0.269) and 0.731 elsewhere: the
+reconstruction collapses under the shadow. Lighting-augmented training (arm A) lifts lighting
+image-AUROC 0.573 → 0.802 (shadowed 0.740) at −0.011 clean, passing its pre-registered bar. Arm B,
+trained without the shadow, handles the other perturbations (0.957) but not the shadow (0.457): the
+robustness is coverage of what was trained on, not general.
 
 ## Status
 
 Refactor done and validated by a reproduction run (re-confirmed on local data 2026-10-26). Fix 2b and
-Fix 2c tested and rejected. The next action is **lighting-augmented training** with the shadow subset
-measured separately: the direct test of whether the lighting failure is partly representation.
-Fix 2c committed as `7ffe4c4` on `main` (not pushed). No stage
+Fix 2c (scoring) rejected; Experiment 3 (lighting-augmented training) accepted. Next: re-run arm A on
+two more seeds, then robustness to *unseen* lighting, judged on a held-out perturbation as arm B is
+(README § Roadmap). Fix 2c (`7ffe4c4`) and Experiment 3 are committed and pushed to `origin/main` (2026-10-26).
+Checkpoints `ae_v3_lightaug*.pt` are local only (gitignored). No stage
 folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints

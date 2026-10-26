@@ -222,13 +222,47 @@ gives 0.937/0.908 clean and 0.555/0.721 lighting, matching the recorded run.
 
 ---
 
+## 6c. Experiment 3 — lighting-augmented training: ACCEPTED (2026-10-26)
+
+**Locating the failure first.** `scripts/label_lighting_subsets.py` replays the seed-0 lighting build,
+records which images received `DirectionalShadow`, and checks every replayed image is byte-identical
+to the stored one (all 83 are; 32 shadowed). On the 179-image baseline, lighting image-AUROC is
+**0.269** on shadowed images (inverted) and 0.731 on unshadowed. The headline 0.573 was an average of
+two different failures.
+
+**Hypothesis.** Representation, not scoring: the model has seen one lighting rig and cannot reconstruct
+a bottle under another. **Design:** two arms, one change each from the 179-image baseline. A applies
+the lighting pipeline (seed 2) to half the training samples, target = the lit image. B does the same
+without the shadow. **Bar for A:** lighting image ≥ 0.673, clean image ≥ 0.928, clean pixel ≥ 0.882.
+
+**Result (raw score, one seed per arm, local CPU):**
+
+| | Clean image | Clean pixel | Lighting image | Lighting pixel | Shadowed | Unshadowed |
+|---|---|---|---|---|---|---|
+| baseline | 0.948 | 0.902 | 0.573 | 0.728 | 0.269 | 0.731 |
+| A | 0.937 | 0.898 | **0.802** | 0.839 | **0.740** | 0.838 |
+| B (no shadow) | 0.948 | 0.889 | 0.783 | 0.850 | 0.457 | 0.957 |
+
+**Every prediction held.** The shadowed reconstruction that collapsed in the baseline is intact in A
+and the map sits on the break (`results/figures/exp3_lighting_*.png`). The original diagnosis, "score
+normalisation, not representation", was wrong; the healthy lighting pixel-AUROC that supported it was
+an average over a subset where the model failed outright. B shows the robustness is coverage of the
+specific perturbation: near-immune to what it trained on, still below chance on the unseen shadow.
+
+**Caveats.** A trains on the test's transform family (different draws), so it shows learnability, not
+robustness to unforeseen lighting. One seed per arm. 7 good images in the shadowed subset, so each one
+moves that subset's image-AUROC by up to 0.14.
+
+---
+
 ## 7. Remaining improvement ladder (planned)
 
-1. **Lighting-augmented training** — train with the photometric transforms (a seed other than the
-   test set's) and measure the shadow subset separately. Directly tests whether the lighting failure
-   is partly representation, which Fix 2c's collapsed shadow frame suggests.
-   *(Fix 2b — per-image median/MAD — and Fix 2c — per-pixel calibration on held-out normals — were
-   tested and rejected. See sections 6 and 6b.)*
+1. **Robustness to unseen lighting** — B shows the model only handles perturbations it was trained on.
+   Candidates: a broader photometric family, or flat-fielding the input against its own low-frequency
+   illumination before the model sees it. Judge on a held-out perturbation, as B does. Re-run A on two
+   more seeds first.
+   *(Fix 2b and Fix 2c, both scoring fixes, were rejected; lighting-augmented training was accepted.
+   See sections 6, 6b and 6c.)*
 2. **Masking-based denoising** — replace additive noise with random patch-masking/inpainting; erases defects more completely, reduces residual false-firing. (Requires retraining.)
 3. **Synthetic defects (DRAEM-style)** — paste fake defect-shaped corruptions on normal images for self-supervised, mask-supervised training. Most likely to push past ~0.95 and lift pixel-F1.
 4. **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start *matching* PatchCore.
@@ -248,5 +282,8 @@ gives 0.937/0.908 clean and 0.555/0.721 lighting, matching the recorded run.
   throughout. Invariance was never the property that mattered.
 - **Check a fix against the metric's invariances before building it.** Fix 2c as first written was an
   affine map per condition, which AUROC cannot see. Five minutes of that reasoning saved a run.
+- **An average can hide an inverted subset.** Lighting pixel-AUROC looked healthy for three versions
+  and justified two scoring fixes. Splitting by the one perturbation that broke reconstruction showed
+  an inverted ranking underneath. Split before diagnosing.
 - **"Nuisance" is a claim about where defects are not.** The rim looked like nuisance in the maps, but
   it is where breakage happens. Break results down by defect type before calling a region noise.

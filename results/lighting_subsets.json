@@ -1,0 +1,318 @@
+{
+ "seed": 0,
+ "images": {
+  "broken_large/000.png": {
+   "shadow": false
+  },
+  "broken_large/001.png": {
+   "shadow": false
+  },
+  "broken_large/002.png": {
+   "shadow": true,
+   "angle": 3.448296944257913,
+   "dark": 0.7360757465489678
+  },
+  "broken_large/003.png": {
+   "shadow": true,
+   "angle": 3.787273988239316,
+   "dark": 0.6679532731987587
+  },
+  "broken_large/004.png": {
+   "shadow": false
+  },
+  "broken_large/005.png": {
+   "shadow": true,
+   "angle": 2.661901610522322,
+   "dark": 0.7083576452266624
+  },
+  "broken_large/006.png": {
+   "shadow": false
+  },
+  "broken_large/007.png": {
+   "shadow": true,
+   "angle": 2.749441536415439,
+   "dark": 0.8067092003128319
+  },
+  "broken_large/008.png": {
+   "shadow": true,
+   "angle": 6.054871697856187,
+   "dark": 0.6033766075303111
+  },
+  "broken_large/009.png": {
+   "shadow": false
+  },
+  "broken_large/010.png": {
+   "shadow": false
+  },
+  "broken_large/011.png": {
+   "shadow": false
+  },
+  "broken_large/012.png": {
+   "shadow": true,
+   "angle": 4.974555126607196,
+   "dark": 0.6615579679011618
+  },
+  "broken_large/013.png": {
+   "shadow": false
+  },
+  "broken_large/014.png": {
+   "shadow": false
+  },
+  "broken_large/015.png": {
+   "shadow": true,
+   "angle": 3.5691292400886723,
+   "dark": 0.8202386553170644
+  },
+  "broken_large/016.png": {
+   "shadow": false
+  },
+  "broken_large/017.png": {
+   "shadow": false
+  },
+  "broken_large/018.png": {
+   "shadow": false
+  },
+  "broken_large/019.png": {
+   "shadow": false
+  },
+  "broken_small/000.png": {
+   "shadow": true,
+   "angle": 0.44633271714891726,
+   "dark": 0.48485171988061626
+  },
+  "broken_small/001.png": {
+   "shadow": false
+  },
+  "broken_small/002.png": {
+   "shadow": false
+  },
+  "broken_small/003.png": {
+   "shadow": false
+  },
+  "broken_small/004.png": {
+   "shadow": true,
+   "angle": 0.1270359377317719,
+   "dark": 0.7830479382191752
+  },
+  "broken_small/005.png": {
+   "shadow": true,
+   "angle": 4.889303064250705,
+   "dark": 0.7980048592987277
+  },
+  "broken_small/006.png": {
+   "shadow": true,
+   "angle": 6.148840389253347,
+   "dark": 0.7696634256866894
+  },
+  "broken_small/007.png": {
+   "shadow": false
+  },
+  "broken_small/008.png": {
+   "shadow": false
+  },
+  "broken_small/009.png": {
+   "shadow": false
+  },
+  "broken_small/010.png": {
+   "shadow": true,
+   "angle": 2.899560348474227,
+   "dark": 0.7622116705145822
+  },
+  "broken_small/011.png": {
+   "shadow": false
+  },
+  "broken_small/012.png": {
+   "shadow": true,
+   "angle": 0.7431401348347824,
+   "dark": 0.7059684085310095
+  },
+  "broken_small/013.png": {
+   "shadow": false
+  },
+  "broken_small/014.png": {
+   "shadow": false
+  },
+  "broken_small/015.png": {
+   "shadow": true,
+   "angle": 0.9007152691844127,
+   "dark": 0.8278675668198335
+  },
+  "broken_small/016.png": {
+   "shadow": false
+  },
+  "broken_small/017.png": {
+   "shadow": true,
+   "angle": 3.2788697077963755,
+   "dark": 0.6158647759962095
+  },
+  "broken_small/018.png": {
+   "shadow": false
+  },
+  "broken_small/019.png": {
+   "shadow": false
+  },
+  "broken_small/020.png": {
+   "shadow": true,
+   "angle": 1.662251934907694,
+   "dark": 0.7596934757736866
+  },
+  "broken_small/021.png": {
+   "shadow": true,
+   "angle": 2.866077065248105,
+   "dark": 0.6773735795474594
+  },
+  "contamination/000.png": {
+   "shadow": false
+  },
+  "contamination/001.png": {
+   "shadow": true,
+   "angle": 0.1180597980265432,
+   "dark": 0.6970541988303508
+  },
+  "contamination/002.png": {
+   "shadow": true,
+   "angle": 3.8459108515969884,
+   "dark": 0.6967735987499027
+  },
+  "contamination/003.png": {
+   "shadow": false
+  },
+  "contamination/004.png": {
+   "shadow": true,
+   "angle": 5.9297440606020535,
+   "dark": 0.7227281196413933
+  },
+  "contamination/005.png": {
+   "shadow": false
+  },
+  "contamination/006.png": {
+   "shadow": true,
+   "angle": 2.258854758700192,
+   "dark": 0.6248127815197366
+  },
+  "contamination/007.png": {
+   "shadow": false
+  },
+  "contamination/008.png": {
+   "shadow": false
+  },
+  "contamination/009.png": {
+   "shadow": true,
+   "angle": 4.3833460800803135,
+   "dark": 0.47409018865170793
+  },
+  "contamination/010.png": {
+   "shadow": true,
+   "angle": 4.1894188298046116,
+   "dark": 0.7182551478472637
+  },
+  "contamination/011.png": {
+   "shadow": true,
+   "angle": 1.321872616625969,
+   "dark": 0.5015705190619413
+  },
+  "contamination/012.png": {
+   "shadow": false
+  },
+  "contamination/013.png": {
+   "shadow": false
+  },
+  "contamination/014.png": {
+   "shadow": true,
+   "angle": 1.9818947799947184,
+   "dark": 0.595484308377049
+  },
+  "contamination/015.png": {
+   "shadow": false
+  },
+  "contamination/016.png": {
+   "shadow": false
+  },
+  "contamination/017.png": {
+   "shadow": false
+  },
+  "contamination/018.png": {
+   "shadow": false
+  },
+  "contamination/019.png": {
+   "shadow": false
+  },
+  "contamination/020.png": {
+   "shadow": false
+  },
+  "good/000.png": {
+   "shadow": false
+  },
+  "good/001.png": {
+   "shadow": false
+  },
+  "good/002.png": {
+   "shadow": true,
+   "angle": 3.582651970090873,
+   "dark": 0.6254406053849282
+  },
+  "good/003.png": {
+   "shadow": false
+  },
+  "good/004.png": {
+   "shadow": true,
+   "angle": 6.210135977294426,
+   "dark": 0.49081792429921123
+  },
+  "good/005.png": {
+   "shadow": false
+  },
+  "good/006.png": {
+   "shadow": true,
+   "angle": 1.3124113649063995,
+   "dark": 0.5145238071539985
+  },
+  "good/007.png": {
+   "shadow": true,
+   "angle": 4.103600634560855,
+   "dark": 0.5513166410159128
+  },
+  "good/008.png": {
+   "shadow": true,
+   "angle": 2.929916996590301,
+   "dark": 0.5477702368006411
+  },
+  "good/009.png": {
+   "shadow": false
+  },
+  "good/010.png": {
+   "shadow": false
+  },
+  "good/011.png": {
+   "shadow": true,
+   "angle": 0.9988353522499858,
+   "dark": 0.4941500564657221
+  },
+  "good/012.png": {
+   "shadow": true,
+   "angle": 4.123840433195416,
+   "dark": 0.5052731805394455
+  },
+  "good/013.png": {
+   "shadow": false
+  },
+  "good/014.png": {
+   "shadow": false
+  },
+  "good/015.png": {
+   "shadow": false
+  },
+  "good/016.png": {
+   "shadow": false
+  },
+  "good/017.png": {
+   "shadow": false
+  },
+  "good/018.png": {
+   "shadow": false
+  },
+  "good/019.png": {
+   "shadow": false
+  }
+ }
+}

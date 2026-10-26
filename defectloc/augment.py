@@ -1,8 +1,9 @@
 """The factory-lighting stress test.
 
-Applied to the **test set only**. Training stays clean, so this measures what
-happens when a model trained under one lighting rig meets another -- the single
-most common way a working inspection model degrades after installation.
+Applied to the test set (seed 0) to measure what happens when a model trained
+under one lighting rig meets another -- the single most common way a working
+inspection model degrades after installation. Experiment 3 also trains with it
+(seed 2, optionally without the shadow); calibration uses seed 1.
 
 Ranges are chosen to be noticeable but not destructive: a person should still
 easily see the bottle and any defect. If a human cannot, the model should not
@@ -43,8 +44,11 @@ class DirectionalShadow(A.ImageOnlyTransform):
         return ("min_factor", "max_factor")
 
 
-def build_factory_lighting(seed: int | None = None) -> A.Compose:
+def build_factory_lighting(seed: int | None = None, shadow: bool = True) -> A.Compose:
     """Photometric-only pipeline: masks pass through unchanged.
+
+    ``shadow=False`` drops `DirectionalShadow`, so a model can be trained on
+    the rest of the pipeline and tested on the shadow it never saw.
 
     The notebook left this unseeded, which meant the lighting test set was a
     different set of images on every run and its numbers were not comparable
@@ -68,8 +72,9 @@ def build_factory_lighting(seed: int | None = None) -> A.Compose:
             val_shift_limit=10,
             p=0.6,
         ),
-        DirectionalShadow(min_factor=0.45, max_factor=0.85, p=0.5),
     ]
+    if shadow:
+        transforms.append(DirectionalShadow(min_factor=0.45, max_factor=0.85, p=0.5))
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)

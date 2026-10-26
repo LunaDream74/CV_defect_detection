@@ -15,6 +15,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from defectloc import __version__
+from defectloc.augment import build_factory_lighting
 from defectloc.config import Config
 from defectloc.data import TrainGood
 from defectloc.losses import recon_loss
@@ -75,7 +76,12 @@ def train(root, cfg: Config, device: torch.device, log_every: int = 10, verbose:
     """Train on ``<root>/train/good`` and return (model, history)."""
     set_seed(cfg.seed)
 
-    ds = TrainGood(root, img_size=cfg.img_size, holdout=cfg.calib_holdout, seed=cfg.seed)
+    lighting = None
+    if cfg.train_lighting_p > 0:
+        lighting = build_factory_lighting(seed=cfg.train_lighting_seed,
+                                          shadow=cfg.train_lighting_shadow)
+    ds = TrainGood(root, img_size=cfg.img_size, holdout=cfg.calib_holdout, seed=cfg.seed,
+                   lighting=lighting, lighting_p=cfg.train_lighting_p)
     loader = DataLoader(
         ds,
         batch_size=cfg.batch_size,
@@ -150,6 +156,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=d.seed)
     p.add_argument("--calib-holdout", type=int, default=d.calib_holdout,
                    help="withhold N train/good images for Fix 2c calibration")
+    p.add_argument("--train-lighting-p", type=float, default=d.train_lighting_p,
+                   help="Experiment 3: apply the factory-lighting pipeline to this fraction of samples")
+    p.add_argument("--no-train-shadow", action="store_true",
+                   help="leave DirectionalShadow out of the training lighting pipeline")
+    p.add_argument("--train-lighting-seed", type=int, default=d.train_lighting_seed)
     p.add_argument("--num-workers", type=int, default=d.num_workers)
     p.add_argument("--log-every", type=int, default=10, help="print loss every N epochs")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
@@ -168,6 +179,9 @@ def main(argv=None) -> int:
         noise_sigma=args.noise_sigma,
         seed=args.seed,
         calib_holdout=args.calib_holdout,
+        train_lighting_p=args.train_lighting_p,
+        train_lighting_shadow=not args.no_train_shadow,
+        train_lighting_seed=args.train_lighting_seed,
     )
     device = pick_device(args.device)
     print(f"device: {device}  |  config: {json.dumps(cfg.to_dict())}", flush=True)

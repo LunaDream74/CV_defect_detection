@@ -41,11 +41,15 @@ def _auroc(y_true, y_score):
 
 @torch.no_grad()
 def evaluate(model, root, cfg: Config, device, batch_size: int = 8,
-             calib: Optional[Dict[str, NormalStats]] = None) -> dict:
+             calib: Optional[Dict[str, NormalStats]] = None,
+             shadow: Optional[Dict[str, bool]] = None) -> dict:
     """Return image/pixel AUROC for every scoring variant, plus a per-type breakdown.
 
     ``calib`` maps extra variant names to the held-out normal statistics each
-    one standardises against with ``pixel_z``.
+    one standardises against with ``pixel_z``. ``shadow`` maps
+    ``<defect_type>/<file>`` to whether that lighting test image was shadowed
+    (scripts/label_lighting_subsets.py); given it, every variant also reports
+    the shadow and no-shadow subsets separately.
     """
     calib = calib or {}
     variants = SCORE_VARIANTS + tuple(calib)
@@ -54,6 +58,12 @@ def evaluate(model, root, cfg: Config, device, batch_size: int = 8,
 
     # Defect type per item, in dataset order, for the per-type breakdown.
     types = [p.parent.name for p, _, _ in ds.items]
+    if shadow is not None:
+        keys = [f"{p.parent.name}/{p.name}" for p, _, _ in ds.items]
+        missing = [k for k in keys if k not in shadow]
+        if missing:
+            raise ValueError(f"shadow labels do not cover {len(missing)} test images, e.g. {missing[0]}")
+        shadowed = np.asarray([shadow[k] for k in keys])
 
     pixel_gt = []
     pixel_scores = {v: [] for v in variants}
@@ -102,6 +112,18 @@ def evaluate(model, root, cfg: Config, device, batch_size: int = 8,
             "pixel_AUROC": _auroc(pixel_gt_all, px_s),
             "per_defect_type": per_type,
         }
+        if shadow is not None:
+            subsets = {}
+            for name, sel in (("shadow", shadowed), ("no_shadow", ~shadowed)):
+                idx = np.flatnonzero(sel)
+                subsets[name] = {
+                    "n": int(sel.sum()),
+                    "n_defective": int(img_gt[sel].sum()),
+                    "image_AUROC": _auroc(img_gt[sel], img_s[sel]),
+                    "pixel_AUROC": _auroc(np.concatenate([pixel_gt[i] for i in idx]),
+                                          np.concatenate([pixel_scores[v][i] for i in idx])),
+                }
+            out["variants"][v]["lighting_subsets"] = subsets
     return out
 
 
@@ -112,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lighting-root", default=None, help="lighting-stressed copy (optional)")
     p.add_argument("--out", default="results/runs/latest.json", help="where to write the run JSON")
     p.add_argument("--label", default="Autoencoder v3", help="row label in the results table")
+    p.add_argument("--lighting-subsets", default=None,
+                   help="results/lighting_subsets.json: also score shadow / no-shadow lighting images")
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     return p
@@ -159,11 +183,18 @@ def main(argv=None) -> int:
                for s in (clean_stats, lit_stats)},
         }
 
+    shadow_labels = None
+    if args.lighting_subsets:
+        meta = json.loads(Path(args.lighting_subsets).read_text(encoding="utf-8"))
+        shadow_labels = {k: v["shadow"] for k, v in meta["images"].items()}
+        run["lighting_subsets"] = str(args.lighting_subsets)
+
     for name, root in (("clean", args.clean_root), ("lighting", args.lighting_root)):
         if root is None:
             continue
         res = evaluate(model, root, cfg, device, batch_size=args.batch_size,
-                       calib=calib_by_cond[name])
+                       calib=calib_by_cond[name],
+                       shadow=shadow_labels if name == "lighting" else None)
         res["root"] = str(root)
         run["conditions"][name] = res
         for v in res["variants"]:
@@ -172,6 +203,9 @@ def main(argv=None) -> int:
                 f"{name:9s} [{v:16s}]  image-AUROC {m['image_AUROC']:.4f}"
                 f"   pixel-AUROC {m['pixel_AUROC']:.4f}"
             )
+            for sname, sm in m.get("lighting_subsets", {}).items():
+                print(f"  {sname:>9s} (n={sm['n']:2d})        image-AUROC {sm['image_AUROC']:.4f}"
+                      f"   pixel-AUROC {sm['pixel_AUROC']:.4f}")
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

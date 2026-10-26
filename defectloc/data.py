@@ -30,6 +30,21 @@ def load_img(path, img_size: int = IMG_SIZE) -> np.ndarray:
     return img.astype(np.float32) / 255.0
 
 
+def load_lit(path, aug, img_size: int = IMG_SIZE) -> np.ndarray:
+    """Like `load_img`, but apply ``aug`` at full resolution first.
+
+    Mirrors scripts/prepare_data.build_lighting followed by `load_img`, so a
+    lit training or calibration image matches how a lit test image was made.
+    """
+    img = cv2.imread(str(path))
+    if img is None:
+        raise FileNotFoundError(f"could not read image: {path}")
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = aug(image=img)["image"]
+    img = cv2.resize(img, (img_size, img_size))
+    return img.astype(np.float32) / 255.0
+
+
 def load_mask(path: Optional[Path], img_size: int = IMG_SIZE) -> np.ndarray:
     """Read a binary ground-truth mask, or an all-zero mask for a good image."""
     if path is None or not Path(path).exists():
@@ -60,11 +75,21 @@ class TrainGood(Dataset):
 
     ``holdout`` images are withheld (see `split_holdout`); ``part`` picks which
     side of the split this dataset serves.
+
+    ``lighting`` (an albumentations pipeline, Experiment 3) is applied to each
+    sample with probability ``lighting_p``, at full resolution before the
+    resize, in the same order the lighting test set was built. The sample *is*
+    the lit image, so the model learns to reproduce a bottle under that
+    lighting rather than to undo it.
     """
 
     def __init__(self, root, img_size: int = IMG_SIZE, holdout: int = 0, seed: int = 0,
-                 part: str = "train"):
+                 part: str = "train", lighting=None, lighting_p: float = 0.0):
         self.img_size = img_size
+        self.lighting = lighting
+        self.lighting_p = lighting_p if lighting is not None else 0.0
+        # Own generator for the apply/skip draw: deterministic with num_workers=0.
+        self._rng = np.random.default_rng(seed)
         paths = sorted((Path(root) / "train" / "good").glob("*.png"))
         if not paths:
             raise FileNotFoundError(
@@ -80,7 +105,10 @@ class TrainGood(Dataset):
         return len(self.paths)
 
     def __getitem__(self, i: int) -> torch.Tensor:
-        img = load_img(self.paths[i], self.img_size)
+        if self.lighting_p > 0 and self._rng.random() < self.lighting_p:
+            img = load_lit(self.paths[i], self.lighting, self.img_size)
+        else:
+            img = load_img(self.paths[i], self.img_size)
         return torch.from_numpy(img).permute(2, 0, 1)  # CHW
 
 

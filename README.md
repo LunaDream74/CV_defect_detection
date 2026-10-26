@@ -8,7 +8,7 @@ The v3 prototype was a single Kaggle notebook. It is now a runnable Python packa
 
 ## Results (MVTec AD, `bottle`)
 
-Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" stress test (brightness/contrast/gamma/color drift + a directional shadow gradient) is applied to the **test set only**; training stays clean.
+Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" stress test (brightness/contrast/gamma/color drift + a directional shadow gradient) is applied to the **test set** (seed 0). Every model trains on clean images except the lighting-augmented rows, which train on a different draw of the same pipeline (seed 2).
 
 | Model | Clean image-AUROC | Clean pixel-AUROC | Lighting image-AUROC | Lighting pixel-AUROC |
 |-------|:-----------------:|:-----------------:|:--------------------:|:--------------------:|
@@ -21,6 +21,8 @@ Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" str
 | Autoencoder v3, 179-image train (30 held out) | 0.948 | 0.902 | 0.573 | 0.728 |
 | ↳ + per-pixel z, matched calibration (rejected) | 0.958 | 0.869 | 0.569 | 0.650 |
 | ↳ + per-pixel z, clean calibration (rejected) | 0.958 | 0.869 | 0.511 | 0.597 |
+| **Autoencoder v3 + lighting-augmented training** | 0.937 | 0.898 | **0.802** | **0.839** |
+| ↳ same, shadow held out of training | 0.948 | 0.889 | 0.783 | 0.850 |
 
 The autoencoder reaches a clean pixel-AUROC of **0.908** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
 
@@ -28,7 +30,7 @@ The re-run reproduces the notebook within run-to-run spread (clean 0.937/0.894 �
 
 Every number and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`.
 
-> **The lighting failure is not fixed.** Under the stress test, *pixel*-AUROC stays healthy (0.720) but *image*-AUROC sits near chance (0.551). The diagnosis was that this is a scoring problem rather than a representation flaw. Two scoring fixes built on it have now failed: per-image median/MAD made things worse in both conditions ([Fix 2b](#fix-2b-what-happened)), and per-pixel calibration on held-out normals left lighting unchanged ([Fix 2c](#fix-2c-what-happened)). Fix 2c also turned up a frame where the reconstruction itself collapses under a directional shadow, which puts the "not representation" half of the diagnosis in question.
+> **The lighting failure was representation, and training under varied lighting closes most of it.** Under the stress test, image-AUROC sat near chance (0.551) while pixel-AUROC looked healthy (0.720), which was read as a scoring problem. Two scoring fixes built on that reading failed ([Fix 2b](#fix-2b-what-happened), [Fix 2c](#fix-2c-what-happened)). Splitting the lighting set by the replayed shadow labels showed the ranking was *inverted* on shadowed frames, where the reconstruction collapses. Lighting-augmented training lifts lighting image-AUROC from 0.573 to 0.802 at a cost of 0.011 clean ([Experiment 3](#experiment-3-what-happened)). The gain holds for the perturbations the model trained on; a shadow it never saw is still not handled.
 
 ---
 
@@ -157,6 +159,55 @@ Contamination sits in the interior, away from the high-variance ring, and per-pi
 
 What is worth keeping: the held-out split, the calibration code and the `--zmap` figure option, all of which the next experiments can reuse; and the contamination result, which says per-pixel normal statistics are a real gain for interior defects.
 
+## Experiment 3: lighting-augmented training
+
+*Design and prediction written 2026-10-26, before training.*
+
+**Where the lighting failure lives.** The lighting set is one seeded pass, so [`scripts/label_lighting_subsets.py`](scripts/label_lighting_subsets.py) replays it, records which images received the directional shadow, and checks that every replayed image is byte-identical to the stored one (all 83 are). On the 179-image baseline checkpoint, raw score:
+
+| Lighting subset | n (good / defective) | Image-AUROC | Pixel-AUROC |
+|---|:---:|:---:|:---:|
+| shadowed | 32 (7 / 25) | **0.269** | 0.664 |
+| not shadowed | 51 (13 / 38) | 0.731 | 0.765 |
+| all | 83 (20 / 63) | 0.573 | 0.728 |
+
+The headline 0.573 averages two different failures. On shadowed frames the ranking is inverted, which fits the collapsed reconstruction seen in Fix 2c. On unshadowed frames it is degraded (0.731 against 0.948 clean) but well above chance. The 7 shadowed good images make the first number noisy; it is a direction, not a precise value.
+
+**Hypothesis.** The model has only seen one lighting rig, so it cannot reconstruct a bottle under another one, and the map fires on the lighting. If that is right, it is a representation problem, and training under varied lighting fixes it where scoring could not.
+
+**Design.** Two arms, each one change from the 179-image baseline (same split, seed and 80 epochs):
+
+- **A, full augmentation.** With probability 0.5 per sample per epoch, apply the factory-lighting pipeline before the denoising noise. The target is the *augmented* image, so the model learns to reproduce a bottle under that lighting, not to undo the lighting (undoing it would make the map fire on the lighting itself). Pipeline seed 2; the test set uses 0 and calibration 1.
+- **B, shadow held out.** Same as A, without `DirectionalShadow`. The shadowed test subset then measures whether robustness extends to a perturbation the model never saw.
+
+Arm A trains on the same family of transforms the test uses, with different draws. Its result therefore says whether the failure is learnable, not that the model will survive unforeseen lighting. Arm B is the closer test of that.
+
+**Prediction.** A raises lighting image-AUROC substantially, most of all on the shadowed subset, which should end above 0.5. Clean holds within noise, since half the samples are still unaugmented. B recovers the unshadowed subset roughly as A does but recovers much less of the shadowed one.
+
+**Accept criterion for A, fixed in advance.** Raw-score lighting image-AUROC of at least 0.673 (+0.10 over 0.573), with clean image-AUROC at least 0.928 and clean pixel-AUROC at least 0.882 (each at most −0.02). B has no pass/fail; it is read against A.
+
+### Experiment 3: what happened
+
+**Arm A accepted.** Raw top-1% score, one checkpoint per arm ([`ae_v3_lightaug.json`](results/runs/ae_v3_lightaug.json), [`ae_v3_lightaug_noshadow.json`](results/runs/ae_v3_lightaug_noshadow.json)):
+
+| | Clean image | Clean pixel | Lighting image | Lighting pixel | Shadowed image | Unshadowed image |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| baseline (179 images) | 0.948 | 0.902 | 0.573 | 0.728 | 0.269 | 0.731 |
+| **A: lighting augmentation** | 0.937 | 0.898 | **0.802** | **0.839** | **0.740** | 0.838 |
+| B: same, shadow held out | 0.948 | 0.889 | 0.783 | 0.850 | 0.457 | **0.957** |
+
+Lighting image-AUROC rose by 0.229 against a bar of 0.10, at a cost of 0.011 clean image and 0.004 clean pixel. Lighting pixel-AUROC, which every previous version left near 0.72, rose too. All four parts of the prediction held: the largest gain is on the shadowed subset (+0.471, now well above chance), clean held, and B recovered the unshadowed images while leaving the shadowed ones below chance.
+
+**The failure was representation.** [`results/figures/exp3_lighting_baseline.png`](results/figures/exp3_lighting_baseline.png) against [`exp3_lighting_lightaug.png`](results/figures/exp3_lighting_lightaug.png), row 3 (the shadowed bottle): the baseline reconstructs a smear and fires along the whole outer edge; arm A reconstructs an intact bottle and the map sits on the break. The project's long-standing diagnosis, "score normalisation, not representation", was wrong. The healthy-looking lighting pixel-AUROC that supported it averaged over a subset where the model failed outright. Two scoring fixes were spent on the wrong half of the problem, and the subset split is what showed it.
+
+**What B adds.** Training on brightness, contrast, gamma and colour shifts makes the model nearly immune to them (0.957 unshadowed, above its own clean 0.948). It does not transfer to a shadow it never saw (0.457). Robustness came from coverage of the specific perturbation, not from a general ability to handle lighting.
+
+**How far this goes.** Arm A trained on the same transform family the test uses, with different random draws. It shows the lighting failure is learnable. It does not show the model would survive lighting no one anticipated, and B suggests it would not. Each arm is one seed. Earlier re-runs moved lighting image-AUROC by about 0.05, well under A's +0.229. The shadowed subset has 7 good images, so each one moves its image-AUROC by up to 0.14, and its numbers are directions, not precise values.
+
+On clean images arm A's maps look like the baseline's ([`results/figures/exp3_clean_lightaug.png`](results/figures/exp3_clean_lightaug.png)). Two small differences: the reconstructed background carries a faint warm cast, learned from the colour-temperature transform, and the one-pixel frame border fires slightly more. Neither touches the defect regions, which fits the small clean cost.
+
+Per-pixel z on top of arm A raises lighting image-AUROC to 0.839 but costs clean pixel-AUROC (0.898 → 0.831), the same rim trade as Fix 2c. Not adopted.
+
 ---
 
 ## Architecture
@@ -185,19 +236,20 @@ defectloc/            the pipeline
   config.py           every value that defines a run, logged into each result
   model.py            the autoencoder
   losses.py           0.5·MSE + 0.5·(1 − SSIM)
-  data.py             MVTec-layout datasets, seeded calibration hold-out split
-  augment.py          the factory-lighting stress test (seeded)
+  data.py             MVTec-layout datasets, hold-out split, lighting-augmented training
+  augment.py          the factory-lighting pipeline (seeded; shadow optional)
   anomaly.py          local-SSIM map, top-k score, median/MAD normalization
   calibrate.py        Fix 2c: per-pixel statistics of held-out normal maps, z map
   train.py            training + checkpoint I/O
-  evaluate.py         image/pixel AUROC, every scoring variant, per-defect-type
+  evaluate.py         image/pixel AUROC, every scoring variant, per-defect-type, shadow subsets
   visualize.py        input / reconstruction / map / ground-truth figures
 scripts/
   prepare_data.py         fetch MVTec AD, build clean + lighting roots
   make_results_table.py   render results/results.md
   patchcore_baseline.py   re-run the PatchCore reference row (optional, heavy)
   make_synthetic_fixture.py  tiny procedural dataset for smoke tests
-tests/test_smoke.py   19 plumbing and invariant tests, no GPU or dataset needed
+  label_lighting_subsets.py  replay the lighting build, label shadowed test images
+tests/test_smoke.py   23 plumbing and invariant tests, no GPU or dataset needed
 results/              history.json (recorded, with provenance) + generated results.md
 ```
 
@@ -260,6 +312,22 @@ python -m defectloc.visualize --checkpoint checkpoints/ae_v3_holdout30.pt \
     --zmap lighting --out results/figures/fix2c_lighting_z.png
 ```
 
+Experiment 3 trains with the lighting pipeline on half the samples (`--no-train-shadow` for arm B) and scores the shadowed and unshadowed lighting images separately. The labels come from replaying the seed-0 lighting build, which fails loudly if any replayed image differs from the stored one:
+
+```bash
+python scripts/label_lighting_subsets.py \
+    --clean-root data/MVTecAD/bottle --lighting-root data/MVTecAD_lighting/bottle
+
+python -m defectloc.train --data-root data/MVTecAD/bottle --calib-holdout 30 \
+    --train-lighting-p 0.5 --out checkpoints/ae_v3_lightaug.pt
+
+python -m defectloc.evaluate --checkpoint checkpoints/ae_v3_lightaug.pt \
+    --clean-root data/MVTecAD/bottle --lighting-root data/MVTecAD_lighting/bottle \
+    --lighting-subsets results/lighting_subsets.json --out results/runs/ae_v3_lightaug.json
+```
+
+On this laptop's CPU, arm A took 27 minutes and arm B 20.
+
 ### Reproducing the table
 
 ```bash
@@ -300,7 +368,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -q
 ```
 
-19 tests, about 15 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
+23 tests, about 15 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
 
 ### PatchCore baseline (optional)
 
@@ -328,7 +396,9 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 - [x] **Refactor** the notebook into Python modules.
 - [x] **Fix 2b — per-image median/MAD score normalization.** Measured and **rejected**: image-AUROC fell in both conditions (clean 0.936 → 0.642, lighting 0.551 → 0.451). Kept in the code as an option, and in the table as a recorded negative result. See [Fix 2b: what happened](#fix-2b-what-happened).
 - [x] **Fix 2c — per-pixel calibration against held-out normal images.** Measured and **rejected**: lighting image-AUROC 0.573 → 0.569 against a pre-registered bar of +0.05. It helps interior contamination (pixel 0.847 → 0.963) and hurts rim breakage (broken_large 0.927 → 0.800). See [Fix 2c: what happened](#fix-2c-what-happened).
-- [ ] **Lighting-augmented training** — train with the photometric transforms (different seed from the test set) so the model learns to reconstruct under them. This is the direct test of the representation half of the diagnosis, which Fix 2c's collapsed shadow frame calls into question. Measure the shadow subset separately.
+- [x] **Lighting-augmented training.** Measured and **accepted**: lighting image-AUROC 0.573 → 0.802, clean −0.011. The shadowed subset went from inverted (0.269) to 0.740. Holding the shadow out of training (arm B) leaves it at 0.457. See [Experiment 3: what happened](#experiment-3-what-happened).
+- [ ] **Robustness to unseen lighting** — B shows coverage, not generality. Candidates: a broader or stronger photometric family in training, or a per-image input normalisation (e.g. flat-field the frame against its own low-frequency illumination) that removes a shadow gradient before the model sees it. Judge on a held-out perturbation, as B does.
+- [ ] **Seed spread** — re-run arm A on two more seeds before quoting 0.802 as more than one run.
 - [ ] **Masking-based denoising** — replace additive noise with random patch masking/inpainting to erase defects more completely and reduce false-firing.
 - [ ] **Synthetic defects (DRAEM-style)** — paste defect-shaped corruptions on normal images for self-supervised, mask-supervised training; expected to push past ~0.95 and improve pixel-F1.
 - [ ] **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start matching memory-bank methods like PatchCore.

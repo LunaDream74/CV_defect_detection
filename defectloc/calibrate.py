@@ -23,14 +23,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-import cv2
 import numpy as np
 import torch
 
 from defectloc.anomaly import anomaly_map
 from defectloc.augment import build_factory_lighting
 from defectloc.config import Config
-from defectloc.data import load_img
+from defectloc.data import load_img, load_lit
 
 # Seed 0 builds the lighting TEST set (scripts/prepare_data.py). Calibration
 # draws from the same lighting distribution with a different seed, so no
@@ -47,17 +46,6 @@ class NormalStats:
     condition: str        # "clean" or "lighting"
 
 
-def _load_lit(path: Path, aug, img_size: int) -> np.ndarray:
-    """Mirror prepare_data.build_lighting then data.load_img: stress at full res, then resize."""
-    img = cv2.imread(str(path))
-    if img is None:
-        raise FileNotFoundError(f"could not read image: {path}")
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img = aug(image=img)["image"]
-    img = cv2.resize(img, (img_size, img_size))
-    return img.astype(np.float32) / 255.0
-
-
 @torch.no_grad()
 def normal_maps(model, paths: List[Path], cfg: Config, device, lighting: bool = False,
                 copies: int = 1, batch_size: int = 8) -> np.ndarray:
@@ -68,7 +56,7 @@ def normal_maps(model, paths: List[Path], cfg: Config, device, lighting: bool = 
     imgs = []
     for _ in range(copies if lighting else 1):
         for p in paths:
-            imgs.append(_load_lit(p, aug, cfg.img_size) if lighting else load_img(p, cfg.img_size))
+            imgs.append(load_lit(p, aug, cfg.img_size) if lighting else load_img(p, cfg.img_size))
     maps = []
     for i in range(0, len(imgs), batch_size):
         x = torch.from_numpy(np.stack(imgs[i:i + batch_size])).permute(0, 3, 1, 2).to(device)

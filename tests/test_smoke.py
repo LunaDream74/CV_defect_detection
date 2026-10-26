@@ -274,7 +274,10 @@ def test_end_to_end_with_calibration_holdout(fixture_root, tmp_path):
     ckpt = tmp_path / "ae_cal.pt"
     assert tr.main(["--data-root", str(fixture_root), "--out", str(ckpt), "--epochs", "1",
                     "--img-size", "64", "--batch-size", "8", "--calib-holdout", "4",
+                    "--train-lighting-p", "0.5", "--no-train-shadow",
                     "--device", "cpu"]) == 0
+    _, saved_cfg, _ = tr.load_checkpoint(ckpt, torch.device("cpu"))
+    assert saved_cfg.train_lighting_p == 0.5 and saved_cfg.train_lighting_shadow is False
     out = tmp_path / "run.json"
     assert ev.main(["--checkpoint", str(ckpt), "--clean-root", str(fixture_root),
                     "--lighting-root", str(fixture_root), "--out", str(out),
@@ -295,6 +298,85 @@ def test_end_to_end_with_calibration_holdout(fixture_root, tmp_path):
     with pytest.raises(SystemExit):
         ev.main(["--checkpoint", str(ckpt), "--clean-root", str(fixture_root),
                  "--out", str(out), "--device", "cpu"])
+
+
+# --------------------------------------------------------------------------
+# Experiment 3: lighting-augmented training and the shadow subset
+# --------------------------------------------------------------------------
+
+def test_shadow_can_be_left_out_of_the_lighting_pipeline():
+    from defectloc.augment import DirectionalShadow
+
+    with_shadow = build_factory_lighting(seed=0).transforms
+    without = build_factory_lighting(seed=0, shadow=False).transforms
+    # Last position, so the seed-0 test set replays unchanged.
+    assert isinstance(with_shadow[-1], DirectionalShadow)
+    assert not any(isinstance(t, DirectionalShadow) for t in without)
+    assert len(without) == len(with_shadow) - 1
+
+
+def test_lighting_augmented_training_samples_are_lit_and_repeatable(fixture_root):
+    plain = TrainGood(fixture_root, img_size=64)
+    lit = lambda: TrainGood(fixture_root, img_size=64, lighting=build_factory_lighting(seed=2),
+                            lighting_p=1.0)
+    # DirectionalShadow draws from NumPy's global RNG (changing that would break
+    # the byte-exact replay of the seed-0 test set), so two live pipelines share
+    # state. Training builds one; here each dataset is built and read in turn.
+    a = lit()
+    first = [a[i] for i in range(len(a))]
+    b = lit()
+    second = [b[i] for i in range(len(b))]
+    # Every transform in the pipeline is probabilistic, so ~0.6% of draws skip
+    # them all; judge the fraction, not one sample.
+    changed = [not torch.equal(x, plain[i]) for i, x in enumerate(first)]
+    assert np.mean(changed) > 0.8, "p=1 must change nearly every sample"
+    assert all(torch.equal(x, y) for x, y in zip(first, second)), "same seeds, same samples"
+    off = TrainGood(fixture_root, img_size=64, lighting=build_factory_lighting(seed=2),
+                    lighting_p=0.0)
+    assert torch.equal(off[0], plain[0])
+
+
+def _lit_fixture(fixture_root, tmp_path):
+    sys.path.insert(0, str(REPO / "scripts"))
+    from prepare_data import build_lighting
+
+    return build_lighting(fixture_root, tmp_path / "lit" / "bottle", seed=0)
+
+
+def test_shadow_labels_replay_the_lighting_build_exactly(fixture_root, tmp_path):
+    import cv2
+    from label_lighting_subsets import replay
+
+    lit = _lit_fixture(fixture_root, tmp_path)
+    labels = replay(fixture_root, lit, seed=0)
+    assert len(labels) == 20
+    assert 0 < sum(v["shadow"] for v in labels.values()) < 20
+    assert all(0.45 <= v["dark"] <= 0.85 for v in labels.values() if v["shadow"])
+
+    # A test set the replay did not produce must be refused, not labelled.
+    victim = next((lit / "test" / "good").glob("*.png"))
+    cv2.imwrite(str(victim), 255 - cv2.imread(str(victim)))
+    with pytest.raises(SystemExit):
+        replay(fixture_root, lit, seed=0)
+
+
+def test_evaluate_reports_shadow_subsets(fixture_root, tmp_path):
+    from label_lighting_subsets import replay
+
+    from defectloc.evaluate import evaluate
+
+    lit = _lit_fixture(fixture_root, tmp_path)
+    shadow = {k: v["shadow"] for k, v in replay(fixture_root, lit, seed=0).items()}
+    cfg = Config(img_size=64, num_workers=0)
+    model = ConvAutoencoder(latent_ch=cfg.latent_ch)
+    res = evaluate(model, lit, cfg, torch.device("cpu"), batch_size=4, shadow=shadow)
+    subsets = res["variants"]["none"]["lighting_subsets"]
+    assert subsets["shadow"]["n"] + subsets["no_shadow"]["n"] == 20
+    assert subsets["shadow"]["n"] == sum(shadow.values())
+
+    shadow.pop(next(iter(shadow)))
+    with pytest.raises(ValueError):
+        evaluate(model, lit, cfg, torch.device("cpu"), batch_size=4, shadow=shadow)
 
 
 def test_reconstruction_is_deterministic_given_a_seed(fixture_root):

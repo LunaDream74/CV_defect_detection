@@ -39,6 +39,11 @@ class Config:
     calib_holdout: int = 0        # train/good images withheld from training (0 = none)
     calib_copies: int = 4         # lighting-stressed copies of each held-out image
 
+    # --- Experiment 3: lighting-augmented training ---
+    train_lighting_p: float = 0.0     # per-sample probability of the lighting pipeline
+    train_lighting_shadow: bool = True  # include DirectionalShadow in that pipeline
+    train_lighting_seed: int = 2      # test set uses 0, calibration 1
+
     # --- reproducibility ---
     seed: int = 0
 

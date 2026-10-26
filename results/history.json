@@ -1,7 +1,7 @@
 {
   "_comment": "Recorded results, with provenance for every number. Rows marked source 'kaggle-notebook' were produced by patchcore-base.ipynb before the module refactor and are transcribed from the project log / surviving cell outputs. Rows marked 'kaggle-run-v2' were measured by this code on Kaggle (results/runs/ae_v3_kaggle.json, log at results/runs/kaggle_v2.log). Runs named in promoted_runs are curated into rows below and are not re-emitted automatically by scripts/make_results_table.py. Rows marked 'local-run' were measured by this code on the local CPU (results/runs/ae_v3_holdout30.json, training log beside it).",
   "dataset": "MVTec AD, category 'bottle' (209 train / 83 test images, 63 defective)",
-  "promoted_runs": ["ae_v3_kaggle.json", "ae_v3_holdout30.json", "ae_v3_local_repro.json"],
+  "promoted_runs": ["ae_v3_kaggle.json", "ae_v3_holdout30.json", "ae_v3_local_repro.json", "ae_v3_lightaug.json", "ae_v3_lightaug_noshadow.json"],
   "rows": [
     {
       "label": "PatchCore (baseline, Anomalib)",
@@ -64,7 +64,7 @@
       "lighting": {"image_AUROC": 0.5734, "pixel_AUROC": 0.7283},
       "source": "local-run",
       "provenance": "results/runs/ae_v3_holdout30.json. Fresh 80-epoch run, seed 0, on 179 of the 209 train images (30 held out for calibration, recorded in the checkpoint), local CPU, 1127 s.",
-      "note": "Baseline for Fix 2c: the raw score on the checkpoint the calibration needs. Its own median/MAD score is consistent with Fix 2b's rejection (clean 0.607, lighting 0.471)."
+      "note": "Baseline for Fix 2c: the raw score on the checkpoint the calibration needs. Its own median/MAD score is consistent with Fix 2b's rejection (clean 0.607, lighting 0.471). Split by the replayed shadow labels (results/lighting_subsets.json), lighting image-AUROC is 0.269 on the 32 shadowed images (inverted) and 0.731 on the 51 unshadowed: the headline 0.573 averages two failures."
     },
     {
       "label": "Autoencoder v3 + per-pixel z, matched calibration (REJECTED)",
@@ -83,6 +83,24 @@
       "source": "local-run",
       "provenance": "Same run, same anomaly maps. Lighting images scored against the CLEAN held-out statistics.",
       "note": "The stricter variant, which assumes nothing about the lighting: worse than raw under lighting (image 0.573 -> 0.511, pixel 0.728 -> 0.597). Clean columns equal the row above by construction."
+    },
+    {
+      "label": "Autoencoder v3 - 179-image train + lighting augmentation (ACCEPTED)",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.93651, "pixel_AUROC": 0.8978},
+      "lighting": {"image_AUROC": 0.80159, "pixel_AUROC": 0.83869},
+      "source": "local-run",
+      "provenance": "results/runs/ae_v3_lightaug.json. Same split, seed and 80 epochs as the 179-image row; the only change is the factory-lighting pipeline (seed 2) applied to half the samples, target = the lit image. Local CPU, 1620 s.",
+      "note": "Experiment 3 arm A passed its pre-registered bar (lighting image >= 0.673, clean image >= 0.928, clean pixel >= 0.882): lighting 0.573 -> 0.802 image, 0.728 -> 0.839 pixel, clean 0.948 -> 0.937 / 0.902 -> 0.898. Shadowed subset 0.269 -> 0.740, unshadowed 0.731 -> 0.838. The shadowed reconstruction that collapsed is intact (results/figures/exp3_lighting_lightaug.png): the lighting failure was representation, not scoring. One seed; trained on the test's transform family with different draws."
+    },
+    {
+      "label": "Autoencoder v3 - 179-image train + lighting augmentation, shadow held out",
+      "kind": "ours",
+      "clean":    {"image_AUROC": 0.94762, "pixel_AUROC": 0.88885},
+      "lighting": {"image_AUROC": 0.78254, "pixel_AUROC": 0.84975},
+      "source": "local-run",
+      "provenance": "results/runs/ae_v3_lightaug_noshadow.json. As the row above without DirectionalShadow in the training pipeline. Local CPU, 1222 s.",
+      "note": "Experiment 3 arm B, read against A (no pass/fail): unshadowed lighting images 0.957 image-AUROC, but shadowed only 0.457. Robustness to brightness, contrast, gamma and colour does not carry over to a shadow the model never saw. One seed; the shadowed subset has 7 good images, so each one moves its image-AUROC by up to 0.14."
     }
   ]
 }
