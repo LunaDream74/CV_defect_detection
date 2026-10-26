@@ -75,7 +75,7 @@ representation" diagnosis is now in question.
 Refactor done and validated by a reproduction run (re-confirmed on local data 2026-10-26). Fix 2b and
 Fix 2c tested and rejected. The next action is **lighting-augmented training** with the shadow subset
 measured separately: the direct test of whether the lighting failure is partly representation.
-Uncommitted as of 2026-10-26: the Fix 2c code, tests, runs, figures and write-ups. No stage
+Fix 2c committed as `7ffe4c4` on `main` (not pushed). No stage
 folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints
