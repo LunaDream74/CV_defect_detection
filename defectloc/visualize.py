@@ -19,12 +19,15 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 from defectloc.anomaly import anomaly_map, normalize_map  # noqa: E402
-from defectloc.data import TestSet  # noqa: E402
+from defectloc.calibrate import fit_normal_stats, normal_maps, z_map  # noqa: E402
+from defectloc.data import TestSet, TrainGood  # noqa: E402
 from defectloc.train import load_checkpoint, pick_device  # noqa: E402
 
 
 @torch.no_grad()
-def make_figure(model, cfg, root, device, n: int = 3, out=None, normalized: bool = False):
+def make_figure(model, cfg, root, device, n: int = 3, out=None, normalized: bool = False,
+                stats=None):
+    """``stats`` (NormalStats) shows the Fix 2c per-pixel z map instead of the raw map."""
     ds = TestSet(root, img_size=cfg.img_size)
     defective = [i for i, (_, _, lab) in enumerate(ds.items) if lab == 1][:n]
     if not defective:
@@ -38,14 +41,17 @@ def make_figure(model, cfg, root, device, n: int = 3, out=None, normalized: bool
         x = img.unsqueeze(0).to(device)
         recon = model(x)[0].cpu().permute(1, 2, 0).numpy()
         amap = anomaly_map(model, x, win=cfg.ssim_window)[0]
-        if normalized:
-            amap = normalize_map(amap)
+        suffix = ""
+        if stats is not None:
+            amap, suffix = z_map(amap, stats), f" (per-pixel z, {stats.condition} calib)"
+        elif normalized:
+            amap, suffix = normalize_map(amap), " (median/MAD)"
 
         defect_type = ds.items[idx][0].parent.name
         panels = [
             (img.permute(1, 2, 0).numpy(), f"input ({defect_type})", None),
             (recon, "reconstruction", None),
-            (amap, "anomaly map" + (" (median/MAD)" if normalized else ""), "inferno"),
+            (amap, "anomaly map" + suffix, "inferno"),
             (mask.numpy(), "ground truth", "gray"),
         ]
         for col, (data, title, cmap) in enumerate(panels):
@@ -70,12 +76,26 @@ def main(argv=None) -> int:
     p.add_argument("--out", default="results/figures/anomaly_maps.png")
     p.add_argument("--n", type=int, default=3)
     p.add_argument("--normalized", action="store_true", help="show the median/MAD-scaled map")
+    p.add_argument("--zmap", choices=["clean", "lighting"], default=None,
+                   help="show the Fix 2c per-pixel z map, calibrated on held-out normals "
+                        "under this condition (checkpoint needs --calib-holdout)")
+    p.add_argument("--train-root", default=None,
+                   help="clean category folder holding train/good (defaults to --data-root)")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     a = p.parse_args(argv)
 
     device = pick_device(a.device)
     model, cfg, _ = load_checkpoint(a.checkpoint, device)
-    make_figure(model, cfg, a.data_root, device, n=a.n, out=a.out, normalized=a.normalized)
+    stats = None
+    if a.zmap:
+        held = TrainGood(a.train_root or a.data_root, cfg.img_size, cfg.calib_holdout, cfg.seed,
+                         part="holdout").paths
+        lit = a.zmap == "lighting"
+        stats = fit_normal_stats(
+            normal_maps(model, held, cfg, device, lighting=lit,
+                        copies=cfg.calib_copies if lit else 1), a.zmap)
+    make_figure(model, cfg, a.data_root, device, n=a.n, out=a.out, normalized=a.normalized,
+                stats=stats)
     return 0
 
 

@@ -181,13 +181,54 @@ module refactor preserved the numerics.
 
 ---
 
+## 6b. Fix 2c — per-pixel calibration on held-out normals: TESTED, REJECTED (2026-10-26)
+
+**Design correction before measuring.** Fix 2c as planned ("calibrate against held-out normals under
+the same condition") meant one mean and std per condition. That is one affine map over every score in
+the condition, and image-AUROC is invariant to it: it could not have moved the number. Rebuilt as
+**per-pixel** calibration: hold out 30 of 209 train images (seeded, recorded in the checkpoint), retrain
+on 179, take each pixel's mean and std over the held-out normal maps, score `z = (amap − mu) /
+max(sigma, median sigma)` with the usual top-1%. Lighting test images are scored against held-out
+normals stressed with lighting seed 1 (`pixel_z`) and against the clean statistics (`pixel_z_cleancal`).
+
+**Predicted direction (written into the README first).** Clean image-AUROC holds and pixel-AUROC rises
+from discounting the rim; lighting image-AUROC rises under `pixel_z`. Bar: +0.05 lighting image-AUROC,
+≤ 0.02 clean image loss.
+
+**Result (local CPU, one checkpoint, four variants in one pass):**
+
+| Scoring | Clean image | Clean pixel | Lighting image | Lighting pixel |
+|---------|-------------|-------------|----------------|----------------|
+| raw top-1% | 0.948 | 0.902 | 0.573 | 0.728 |
+| `pixel_z`, matched | 0.958 | 0.869 | **0.569** | 0.650 |
+| `pixel_z_cleancal` | 0.958 | 0.869 | 0.511 | 0.597 |
+
+**Mechanism.**
+
+1. **The rim is where bottles break.** Clean pixel-AUROC per type: contamination 0.847 → 0.963,
+   broken_large 0.927 → 0.800, broken_small 0.971 → 0.894. 35–41% of breakage pixels sit in the
+   top-10% sigma zone against 3% of contamination pixels. Dividing out the rim's normal spread divides
+   out breakage too. Part of what was called "rim over-firing" is the defect class that lives there.
+2. **Lighting swamps the per-pixel structure.** The sigma floor over lighting-stressed normals is 0.260
+   against 0.017 clean, so `pixel_z` under lighting is close to a smoothed raw map.
+
+**New observation.** In `results/figures/fix2c_lighting_z.png` row 3 (directional shadow) the
+reconstruction itself collapses. One frame, not a measurement, but it means part of the lighting
+failure may be representation after all. The healthy lighting pixel-AUROC that supported "score, not
+representation" is an average and can hide a subset of frames where the model fails outright.
+
+**Also confirmed:** the Kaggle refactor checkpoint `ae_v3.pt` re-evaluated on the local copy of the data
+gives 0.937/0.908 clean and 0.555/0.721 lighting, matching the recorded run.
+
+---
+
 ## 7. Remaining improvement ladder (planned)
 
-1. **Fix 2c** — calibrate the image score against held-out *normal* images under the same condition,
-   rather than against the image's own pixels, so the defect cannot inflate its own divisor. This is
-   the direct repair of the Fix 2b failure. Alternative: normalize by an input-side statistic (frame
-   brightness) rather than a statistic of the error map.
-   *(Fix 2b — per-image median/MAD normalization — was tested and rejected. See section 6.)*
+1. **Lighting-augmented training** — train with the photometric transforms (a seed other than the
+   test set's) and measure the shadow subset separately. Directly tests whether the lighting failure
+   is partly representation, which Fix 2c's collapsed shadow frame suggests.
+   *(Fix 2b — per-image median/MAD — and Fix 2c — per-pixel calibration on held-out normals — were
+   tested and rejected. See sections 6 and 6b.)*
 2. **Masking-based denoising** — replace additive noise with random patch-masking/inpainting; erases defects more completely, reduces residual false-firing. (Requires retraining.)
 3. **Synthetic defects (DRAEM-style)** — paste fake defect-shaped corruptions on normal images for self-supervised, mask-supervised training. Most likely to push past ~0.95 and lift pixel-F1.
 4. **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start *matching* PatchCore.
@@ -205,3 +246,7 @@ module refactor preserved the numerics.
   contaminated by the defect. Diagnosis and remedy need separate evidence.
 - **Watch what a unit test actually claims.** The Fix 2b tests proved affine invariance and passed
   throughout. Invariance was never the property that mattered.
+- **Check a fix against the metric's invariances before building it.** Fix 2c as first written was an
+  affine map per condition, which AUROC cannot see. Five minutes of that reasoning saved a run.
+- **"Nuisance" is a claim about where defects are not.** The rim looked like nuisance in the maps, but
+  it is where breakage happens. Break results down by defect type before calling a region noise.

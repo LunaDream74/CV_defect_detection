@@ -18,7 +18,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-ScoreNorm = Literal["none", "median_mad"]
+ScoreNorm = Literal["none", "median_mad", "pixel_z"]
 
 # Standard SSIM stabilisers for data in [0, 1].
 _C1 = 0.01 ** 2
@@ -82,7 +82,8 @@ def normalize_map(amap: np.ndarray, eps: float = 1e-8) -> np.ndarray:
     return (amap - med) / (mad + eps)
 
 
-def image_score(amap: np.ndarray, topk_frac: float = 0.01, norm: ScoreNorm = "none") -> float:
+def image_score(amap: np.ndarray, topk_frac: float = 0.01, norm: ScoreNorm = "none",
+                stats=None) -> float:
     """Reduce an anomaly map to one number: mean of the hottest ``topk_frac`` pixels.
 
     The top-k mean is more robust than a pure max, which a single hot pixel of
@@ -92,9 +93,17 @@ def image_score(amap: np.ndarray, topk_frac: float = 0.01, norm: ScoreNorm = "no
     normalisation is monotonic within an image, so the same pixels stay hottest.
     It only changes the units the score is reported in, and that is exactly the
     point: it makes scores comparable *across* images.
+
+    ``pixel_z`` (Fix 2c) is the exception: it standardises each pixel against
+    held-out normal ``stats`` (`defectloc.calibrate.NormalStats`), which is not
+    monotonic within an image, so it can and should change which pixels win.
     """
     if norm == "median_mad":
         amap = normalize_map(amap)
+    elif norm == "pixel_z":
+        from defectloc.calibrate import z_map  # calibrate imports this module
+
+        amap = z_map(amap, stats)
     elif norm != "none":
         raise ValueError(f"unknown score normalisation: {norm!r}")
 

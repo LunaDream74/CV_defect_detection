@@ -22,7 +22,10 @@ The notebook has been refactored into a runnable package. This folder is a git r
   `evaluate`, `visualize`)
 - `scripts/` — `prepare_data.py`, `make_results_table.py`, `patchcore_baseline.py`,
   `make_synthetic_fixture.py`
-- `tests/` — 14 tests, ~10s, no GPU and no dataset required
+- `tests/` — 19 tests, ~15s, no GPU and no dataset required
+- `defectloc/calibrate.py` — Fix 2c per-pixel calibration (rejected, kept for reuse)
+- Local data: `data/` (gitignored) holds MVTec bottle, fetched file by file from Kaggle on
+  2026-10-26 (`data/raw/bottle`), plus the built clean and lighting roots. Torch is CPU-only here.
 
 `README.md` § How to run has the commands. Nothing here needs Kaggle any more, though
 `prepare_data.py --kagglehub` still works if a Kaggle token is present.
@@ -35,6 +38,8 @@ The notebook has been refactored into a runnable package. This folder is a git r
 | Autoencoder v3 (notebook run) | 0.937 | 0.894 | 0.512 | 0.715 |
 | Autoencoder v3 (re-run post-refactor) | 0.936 | **0.908** | **0.551** | 0.720 |
 | Autoencoder v3 + median/MAD score (rejected) | 0.642 | 0.885 | 0.451 | 0.728 |
+| Autoencoder v3, 179-image train (30 held out) | 0.948 | 0.902 | 0.573 | 0.728 |
+| ↳ + per-pixel z, matched calibration (rejected) | 0.958 | 0.869 | 0.569 | 0.650 |
 
 Chance AUROC is 0.500. Built from scratch: v1 0.700 → v2 0.741 (tighter bottleneck + denoising,
 killed the identity shortcut) → v3 0.894 (local-SSIM anomaly map, no retraining).
@@ -56,14 +61,21 @@ signal, and MAD is not defect-invariant because the map fires across the whole r
 defective image gets a larger divisor. The code and the numbers are kept so the failure is not
 retried by accident.
 
-The diagnosis still stands; the remedy does not. Next candidate (Fix 2c) is to calibrate against
-held-out normal images rather than against the image's own pixels, so the defect cannot inflate its
-own divisor.
+**The second fix was measured and rejected too (2026-10-26).** Fix 2c, per-pixel calibration on 30
+held-out normal images, moved lighting image-AUROC 0.573 → 0.569 against a pre-registered bar of
++0.05 (README § Fix 2c: what happened). It helps interior contamination (pixel 0.847 → 0.963) and hurts
+breakage (broken_large 0.927 → 0.800), because bottles break at the rim the calibration discounts.
+Under lighting the normal spread is ~16× the clean spread, so the calibration has nothing to grip.
+
+Fix 2c also showed a shadowed frame whose reconstruction collapses outright, so the "score, not
+representation" diagnosis is now in question.
 
 ## Status
 
-Refactor done and validated by a reproduction run. Fix 2b tested and rejected. The next action is
-Fix 2c, or tightening the map's rim over-firing, which is the more fundamental problem. No stage
+Refactor done and validated by a reproduction run (re-confirmed on local data 2026-10-26). Fix 2b and
+Fix 2c tested and rejected. The next action is **lighting-augmented training** with the shadow subset
+measured separately: the direct test of whether the lighting failure is partly representation.
+Uncommitted as of 2026-10-26: the Fix 2c code, tests, runs, figures and write-ups. No stage
 folders: the pipeline is a package with a CLI, not a staged workflow.
 
 ## Standing constraints

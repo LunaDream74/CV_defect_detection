@@ -1,0 +1,12 @@
+device: cpu  |  config: {"img_size": 256, "num_workers": 0, "latent_ch": 64, "epochs": 80, "batch_size": 16, "lr": 0.0002, "noise_sigma": 0.1, "loss_alpha": 0.5, "ssim_window": 11, "topk_frac": 0.01, "calib_holdout": 30, "calib_copies": 4, "seed": 0}
+epoch   1/80  loss 0.4606
+epoch  10/80  loss 0.3042
+epoch  20/80  loss 0.1348
+epoch  30/80  loss 0.0975
+epoch  40/80  loss 0.0837
+epoch  50/80  loss 0.0765
+epoch  60/80  loss 0.0721
+epoch  70/80  loss 0.0690
+epoch  80/80  loss 0.0666
+
+trained in 1127.1s  ->  checkpoints\ae_v3_holdout30.pt

@@ -39,17 +39,42 @@ def load_mask(path: Optional[Path], img_size: int = IMG_SIZE) -> np.ndarray:
     return (m > 0).astype(np.float32)
 
 
-class TrainGood(Dataset):
-    """Normal images only -- the model never sees a defect during training."""
+def split_holdout(paths: List[Path], n_holdout: int, seed: int = 0) -> Tuple[List[Path], List[Path]]:
+    """Deterministically split ``paths`` into (train, held-out).
 
-    def __init__(self, root, img_size: int = IMG_SIZE):
+    The held-out normals calibrate the score (Fix 2c). They must be images the
+    model never trained on: a training image reconstructs better than an unseen
+    normal one, so calibrating on it would understate how hot a normal map runs.
+    """
+    if not 0 <= n_holdout < len(paths):
+        raise ValueError(f"cannot hold out {n_holdout} of {len(paths)} images")
+    order = np.random.default_rng(seed).permutation(len(paths))
+    held = set(order[:n_holdout].tolist())
+    train = [p for i, p in enumerate(paths) if i not in held]
+    holdout = [p for i, p in enumerate(paths) if i in held]
+    return train, holdout
+
+
+class TrainGood(Dataset):
+    """Normal images only -- the model never sees a defect during training.
+
+    ``holdout`` images are withheld (see `split_holdout`); ``part`` picks which
+    side of the split this dataset serves.
+    """
+
+    def __init__(self, root, img_size: int = IMG_SIZE, holdout: int = 0, seed: int = 0,
+                 part: str = "train"):
         self.img_size = img_size
-        self.paths: List[Path] = sorted((Path(root) / "train" / "good").glob("*.png"))
-        if not self.paths:
+        paths = sorted((Path(root) / "train" / "good").glob("*.png"))
+        if not paths:
             raise FileNotFoundError(
                 f"no training images under {Path(root) / 'train' / 'good'}. "
                 "Run `python scripts/prepare_data.py` first."
             )
+        if part not in ("train", "holdout"):
+            raise ValueError(f"part must be 'train' or 'holdout', got {part!r}")
+        train, held = split_holdout(paths, holdout, seed)
+        self.paths: List[Path] = train if part == "train" else held
 
     def __len__(self) -> int:
         return len(self.paths)

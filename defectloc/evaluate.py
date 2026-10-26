@@ -1,8 +1,10 @@
 """Evaluate a checkpoint: image-AUROC and pixel-AUROC, PatchCore-comparable.
 
-Scores both ways in a single pass over the test set -- raw top-k (the v3
-notebook behaviour) and median/MAD-normalised (the fix) -- so the two are
-always measured on identical maps and the comparison cannot drift.
+Scores every variant in a single pass over the test set -- raw top-k (the v3
+notebook behaviour), median/MAD-normalised (Fix 2b, rejected) and, for a
+checkpoint trained with ``--calib-holdout``, per-pixel z against held-out
+normals (Fix 2c) -- so all are measured on identical maps and the comparison
+cannot drift.
 
     python -m defectloc.evaluate --checkpoint checkpoints/ae_v3.pt \
         --clean-root data/MVTecAD/bottle \
@@ -13,6 +15,7 @@ import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
+from typing import Dict, Optional
 
 import numpy as np
 import torch
@@ -20,8 +23,9 @@ from sklearn.metrics import roc_auc_score
 from torch.utils.data import DataLoader
 
 from defectloc.anomaly import anomaly_map, image_score, normalize_map
+from defectloc.calibrate import NormalStats, fit_normal_stats, normal_maps, z_map
 from defectloc.config import Config
-from defectloc.data import TestSet
+from defectloc.data import TestSet, TrainGood
 from defectloc.train import load_checkpoint, pick_device, set_seed
 
 SCORE_VARIANTS = ("none", "median_mad")
@@ -36,8 +40,15 @@ def _auroc(y_true, y_score):
 
 
 @torch.no_grad()
-def evaluate(model, root, cfg: Config, device, batch_size: int = 8) -> dict:
-    """Return image/pixel AUROC for every scoring variant, plus a per-type breakdown."""
+def evaluate(model, root, cfg: Config, device, batch_size: int = 8,
+             calib: Optional[Dict[str, NormalStats]] = None) -> dict:
+    """Return image/pixel AUROC for every scoring variant, plus a per-type breakdown.
+
+    ``calib`` maps extra variant names to the held-out normal statistics each
+    one standardises against with ``pixel_z``.
+    """
+    calib = calib or {}
+    variants = SCORE_VARIANTS + tuple(calib)
     ds = TestSet(root, img_size=cfg.img_size)
     loader = DataLoader(ds, batch_size=batch_size, shuffle=False, num_workers=cfg.num_workers)
 
@@ -45,9 +56,9 @@ def evaluate(model, root, cfg: Config, device, batch_size: int = 8) -> dict:
     types = [p.parent.name for p, _, _ in ds.items]
 
     pixel_gt = []
-    pixel_scores = {v: [] for v in SCORE_VARIANTS}
+    pixel_scores = {v: [] for v in variants}
     img_gt = []
-    img_scores = {v: [] for v in SCORE_VARIANTS}
+    img_scores = {v: [] for v in variants}
 
     for imgs, masks, labels in loader:
         amaps = anomaly_map(model, imgs.to(device), win=cfg.ssim_window)  # B,H,W
@@ -55,17 +66,22 @@ def evaluate(model, root, cfg: Config, device, batch_size: int = 8) -> dict:
         for amap, m, lab in zip(amaps, masks, labels.numpy()):
             pixel_gt.append(m.ravel())
             img_gt.append(int(lab))
-            for v in SCORE_VARIANTS:
-                scored = normalize_map(amap) if v == "median_mad" else amap
+            for v in variants:
+                if v in calib:
+                    scored = z_map(amap, calib[v])
+                    s = image_score(amap, topk_frac=cfg.topk_frac, norm="pixel_z", stats=calib[v])
+                else:
+                    scored = normalize_map(amap) if v == "median_mad" else amap
+                    s = image_score(amap, topk_frac=cfg.topk_frac, norm=v)
                 pixel_scores[v].append(scored.ravel())
-                img_scores[v].append(image_score(amap, topk_frac=cfg.topk_frac, norm=v))
+                img_scores[v].append(s)
 
     pixel_gt_all = np.concatenate(pixel_gt)
     img_gt = np.asarray(img_gt)
     types = np.asarray(types)
 
     out = {"n_images": len(ds), "n_defective": int(img_gt.sum()), "variants": {}}
-    for v in SCORE_VARIANTS:
+    for v in variants:
         img_s = np.asarray(img_scores[v])
         px_s = np.concatenate(pixel_scores[v])
 
@@ -117,16 +133,43 @@ def main(argv=None) -> int:
         "conditions": {},
     }
 
+    # Fix 2c. Clean-condition test images are scored against clean held-out
+    # normals; lighting ones against lighting-stressed held-out normals
+    # ("pixel_z", which assumes the deployment lighting distribution is known)
+    # and against the clean statistics ("pixel_z_cleancal", which does not).
+    calib_by_cond = {"clean": {}, "lighting": {}}
+    if cfg.calib_holdout > 0:
+        held = TrainGood(args.clean_root, cfg.img_size, cfg.calib_holdout, cfg.seed,
+                         part="holdout").paths
+        recorded = ckpt.get("calib_holdout_files")
+        if recorded is not None and recorded != [p.name for p in held]:
+            raise SystemExit("held-out split re-derived from --clean-root does not match "
+                             "the one recorded in the checkpoint")
+        clean_stats = fit_normal_stats(normal_maps(model, held, cfg, device), "clean")
+        lit_stats = fit_normal_stats(
+            normal_maps(model, held, cfg, device, lighting=True, copies=cfg.calib_copies),
+            "lighting")
+        # On clean test images the two variants coincide by construction; both
+        # are scored so each table row is complete.
+        calib_by_cond = {"clean": {"pixel_z": clean_stats, "pixel_z_cleancal": clean_stats},
+                         "lighting": {"pixel_z": lit_stats, "pixel_z_cleancal": clean_stats}}
+        run["calibration"] = {
+            "holdout_files": [p.name for p in held],
+            **{s.condition: {"n_maps": s.n_maps, "sigma_floor": s.floor}
+               for s in (clean_stats, lit_stats)},
+        }
+
     for name, root in (("clean", args.clean_root), ("lighting", args.lighting_root)):
         if root is None:
             continue
-        res = evaluate(model, root, cfg, device, batch_size=args.batch_size)
+        res = evaluate(model, root, cfg, device, batch_size=args.batch_size,
+                       calib=calib_by_cond[name])
         res["root"] = str(root)
         run["conditions"][name] = res
-        for v in SCORE_VARIANTS:
+        for v in res["variants"]:
             m = res["variants"][v]
             print(
-                f"{name:9s} [{v:10s}]  image-AUROC {m['image_AUROC']:.4f}"
+                f"{name:9s} [{v:16s}]  image-AUROC {m['image_AUROC']:.4f}"
                 f"   pixel-AUROC {m['pixel_AUROC']:.4f}"
             )
 

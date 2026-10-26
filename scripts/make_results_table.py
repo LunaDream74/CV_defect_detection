@@ -14,6 +14,13 @@ from pathlib import Path
 
 CONDITIONS = ("clean", "lighting")
 METRICS = ("image_AUROC", "pixel_AUROC")
+# Order matters: rows of one run are emitted in this order.
+VARIANT_LABELS = (
+    ("none", "raw top-k score"),
+    ("median_mad", "median/MAD score"),
+    ("pixel_z", "per-pixel z, matched-condition calibration"),
+    ("pixel_z_cleancal", "per-pixel z, clean calibration"),
+)
 
 
 def fmt(v) -> str:
@@ -34,7 +41,7 @@ def load_runs(runs_dir: Path, promoted: set[str] | None = None) -> list[dict]:
         if f.name in promoted:
             continue
         run = json.loads(f.read_text(encoding="utf-8"))
-        for variant, vlabel in (("none", "raw top-k score"), ("median_mad", "median/MAD score")):
+        for variant, vlabel in VARIANT_LABELS:
             row = {
                 "label": f"{run.get('label', f.stem)} ({vlabel})",
                 "kind": "ours",

@@ -127,6 +127,77 @@ def test_image_score_rejects_an_unknown_normalisation():
 
 
 # --------------------------------------------------------------------------
+# Fix 2c: per-pixel calibration on held-out normals
+# --------------------------------------------------------------------------
+
+def test_one_mean_and_std_per_condition_cannot_change_the_ranking():
+    """Why Fix 2c is per pixel. Uniform statistics are one affine map for every
+    image in a condition, and image-AUROC is invariant to that, so the 'calibrate
+    against normal images' fix as first written could not have moved the metric."""
+    from defectloc.calibrate import NormalStats
+
+    rng = np.random.default_rng(0)
+    maps = [rng.normal(0.1, 0.02, (32, 32)) + (i % 3) * 0.05 for i in range(9)]
+    uniform = NormalStats(mu=np.full((32, 32), 0.1), sigma=np.full((32, 32), 0.03),
+                          floor=0.0, n_maps=9, condition="clean")
+    raw = [image_score(m) for m in maps]
+    cal = [image_score(m, norm="pixel_z", stats=uniform) for m in maps]
+    assert np.array_equal(np.argsort(raw), np.argsort(cal))
+
+
+def test_pixel_z_discounts_a_rim_that_fires_on_normal_images_too():
+    """The rim case. Every normal map is hot on the rim; a defect elsewhere is
+    dimmer than the rim. Raw top-k ranks a good image above the defective one,
+    per-pixel z against held-out normals does not."""
+    from defectloc.calibrate import fit_normal_stats
+
+    rng = np.random.default_rng(0)
+    rim = np.zeros((64, 64), bool)
+    rim[:, :4] = True
+
+    def base():
+        m = rng.normal(0.10, 0.01, (64, 64))
+        m[rim] += rng.normal(0.90, 0.10)
+        return m
+
+    stats = fit_normal_stats(np.stack([base() for _ in range(30)]), "clean")
+    good = base()
+    defective = base()
+    defective[rim] -= 0.2          # this frame's rim happens to run cooler
+    defective[30:36, 30:36] = 0.8  # defect, dimmer than a typical rim
+
+    assert image_score(good) > image_score(defective), "sanity: raw misranks"
+    assert (image_score(defective, norm="pixel_z", stats=stats)
+            > image_score(good, norm="pixel_z", stats=stats))
+
+
+def test_pixel_z_needs_matching_statistics():
+    from defectloc.calibrate import fit_normal_stats
+
+    stats = fit_normal_stats(np.zeros((3, 8, 8)), "clean")
+    with pytest.raises(ValueError):
+        image_score(np.zeros((8, 8)), norm="pixel_z")          # no stats
+    with pytest.raises(ValueError):
+        image_score(np.zeros((16, 16)), norm="pixel_z", stats=stats)  # wrong shape
+    # Degenerate calibration (sigma == 0 everywhere) must not divide by zero.
+    assert np.isfinite(image_score(np.ones((8, 8)), norm="pixel_z", stats=stats))
+
+
+def test_holdout_split_is_deterministic_and_disjoint(fixture_root):
+    from defectloc.data import split_holdout
+
+    paths = TrainGood(fixture_root).paths
+    tr, ho = split_holdout(paths, 5, seed=0)
+    tr2, ho2 = split_holdout(paths, 5, seed=0)
+    assert (tr, ho) == (tr2, ho2)
+    assert len(ho) == 5 and len(tr) == len(paths) - 5 and not set(tr) & set(ho)
+    assert TrainGood(fixture_root, holdout=5, part="holdout").paths == ho
+    assert TrainGood(fixture_root, holdout=5).paths == tr
+    with pytest.raises(ValueError):
+        split_holdout(paths, len(paths), seed=0)
+
+
+# --------------------------------------------------------------------------
 # augmentation
 # --------------------------------------------------------------------------
 
@@ -190,6 +261,40 @@ def test_end_to_end_train_evaluate(fixture_root, tmp_path):
         assert 0.0 <= m["image_AUROC"] <= 1.0
         assert 0.0 <= m["pixel_AUROC"] <= 1.0
         assert set(m["per_defect_type"]) == {"chip", "contamination"}
+
+
+def test_end_to_end_with_calibration_holdout(fixture_root, tmp_path):
+    """The Fix 2c path through the real CLIs: train with a hold-out, evaluate
+    every variant, and refuse a checkpoint whose recorded split does not match."""
+    import json
+
+    from defectloc import evaluate as ev
+    from defectloc import train as tr
+
+    ckpt = tmp_path / "ae_cal.pt"
+    assert tr.main(["--data-root", str(fixture_root), "--out", str(ckpt), "--epochs", "1",
+                    "--img-size", "64", "--batch-size", "8", "--calib-holdout", "4",
+                    "--device", "cpu"]) == 0
+    out = tmp_path / "run.json"
+    assert ev.main(["--checkpoint", str(ckpt), "--clean-root", str(fixture_root),
+                    "--lighting-root", str(fixture_root), "--out", str(out),
+                    "--device", "cpu"]) == 0
+    run = json.loads(out.read_text(encoding="utf-8"))
+    assert len(run["calibration"]["holdout_files"]) == 4
+    assert run["calibration"]["lighting"]["n_maps"] == 4 * Config().calib_copies
+    for cond in ("clean", "lighting"):
+        assert set(run["conditions"][cond]["variants"]) == {
+            "none", "median_mad", "pixel_z", "pixel_z_cleancal"}
+    clean = run["conditions"]["clean"]["variants"]
+    assert clean["pixel_z"]["image_AUROC"] == clean["pixel_z_cleancal"]["image_AUROC"]
+
+    model, cfg, meta = tr.load_checkpoint(ckpt, torch.device("cpu"))
+    meta["calib_holdout_files"] = ["not-a-file.png"] * 4
+    tr.save_checkpoint(ckpt, model, cfg, meta["history"],
+                       extra={"calib_holdout_files": meta["calib_holdout_files"]})
+    with pytest.raises(SystemExit):
+        ev.main(["--checkpoint", str(ckpt), "--clean-root", str(fixture_root),
+                 "--out", str(out), "--device", "cpu"])
 
 
 def test_reconstruction_is_deterministic_given_a_seed(fixture_root):

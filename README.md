@@ -18,6 +18,9 @@ Chance AUROC is **0.500** for both metrics. A photometric "factory-lighting" str
 | Autoencoder v3 (original notebook run) | 0.937 | 0.894 | 0.512 | 0.715 |
 | **Autoencoder v3 (re-run after refactor)** | 0.936 | **0.908** | 0.551 | 0.720 |
 | Autoencoder v3 + median/MAD score (rejected) | 0.642 | 0.885 | 0.451 | 0.728 |
+| Autoencoder v3, 179-image train (30 held out) | 0.948 | 0.902 | 0.573 | 0.728 |
+| ↳ + per-pixel z, matched calibration (rejected) | 0.958 | 0.869 | 0.569 | 0.650 |
+| ↳ + per-pixel z, clean calibration (rejected) | 0.958 | 0.869 | 0.511 | 0.597 |
 
 The autoencoder reaches a clean pixel-AUROC of **0.908** from scratch, against PatchCore's 0.986. PatchCore is a baseline to measure the gap against, not part of this model.
 
@@ -25,7 +28,7 @@ The re-run reproduces the notebook within run-to-run spread (clean 0.937/0.894 �
 
 Every number and its provenance is in [`results/results.md`](results/results.md), generated from [`results/history.json`](results/history.json) by `scripts/make_results_table.py`.
 
-> **The lighting failure is not fixed.** Under the stress test, *pixel*-AUROC stays healthy (0.720) but *image*-AUROC sits near chance (0.551). The diagnosis was that this is a scoring problem rather than a representation flaw. That diagnosis still looks right, and the first fix built on it made things worse in both conditions. See [Fix 2b: what happened](#fix-2b-what-happened).
+> **The lighting failure is not fixed.** Under the stress test, *pixel*-AUROC stays healthy (0.720) but *image*-AUROC sits near chance (0.551). The diagnosis was that this is a scoring problem rather than a representation flaw. Two scoring fixes built on it have now failed: per-image median/MAD made things worse in both conditions ([Fix 2b](#fix-2b-what-happened)), and per-pixel calibration on held-out normals left lighting unchanged ([Fix 2c](#fix-2c-what-happened)). Fix 2c also turned up a frame where the reconstruction itself collapses under a directional shadow, which puts the "not representation" half of the diagnosis in question.
 
 ---
 
@@ -105,6 +108,55 @@ Ordered by how much of the above they address, and stated as hypotheses rather t
 2. **Normalize with an input-side statistic** such as the frame's mean brightness, rather than a statistic of the error map. Same reasoning: keep the defect out of the denominator.
 3. **Tighten the map first.** The rim over-firing visible in the figures is what makes MAD defect-sensitive. A map that fired only on defects would make every scoring rule easier, and it is the more fundamental problem.
 
+## Fix 2c: per-pixel calibration on held-out normals
+
+*Design and prediction written 2026-10-26, before the measurement.*
+
+Idea 1 above, as first written, could not have worked. One mean and one standard deviation per condition is a single affine map applied to every score in that condition, and image-AUROC ignores affine maps: the number would come back unchanged. `test_one_mean_and_std_per_condition_cannot_change_the_ranking` pins that.
+
+So the calibration is per pixel. Withhold 30 of the 209 training images (`--calib-holdout 30`, a seeded split recorded in the checkpoint), train on the other 179, and compute the mean `mu(p)` and spread `sigma(p)` of each pixel's anomaly value over the held-out normals. A test map is scored as `z(p) = (amap(p) − mu(p)) / max(sigma(p), floor)`, with `floor` fixed at the median of `sigma` over pixels, then the usual top-1% mean. [`defectloc/calibrate.py`](defectloc/calibrate.py) implements it.
+
+This addresses both mistakes in Fix 2b. The reference comes from other images, so a defect cannot inflate its own divisor. And because the rim fires on normal bottles too, its high `mu` and `sigma` are divided out, which is idea 3 attacked through the score instead of the map.
+
+The held-out images must be unseen. A training image reconstructs better than a new normal one, so calibrating on `ae_v3.pt`'s own training set would understate how hot a normal map runs. That is why this needs a retrained checkpoint, and why its raw score is re-measured on that checkpoint instead of compared with the 0.936 / 0.551 above.
+
+Two lighting variants are scored in one pass:
+
+- **`pixel_z`**: lighting test images against held-out normals stressed by the same lighting *distribution* (seed 1, four copies each; the test set uses seed 0). This assumes the deployment lighting range is known.
+- **`pixel_z_cleancal`**: lighting test images against the clean statistics. This assumes nothing about the lighting and is the stricter test.
+
+**Prediction.** On clean images, image-AUROC at least holds and pixel-AUROC rises, from discounting the rim. Under lighting, `pixel_z` raises image-AUROC over the raw score; `pixel_z_cleancal` gains less or nothing. The method removes *where normals fire*, not *how bright this frame is*, so it does not directly cancel a per-image brightness offset. That is the part of the diagnosis it leaves alone, and the reason a small lighting gain would not be a surprise.
+
+**Accept criterion, fixed in advance.** On the same checkpoint, `pixel_z` must raise lighting image-AUROC by at least 0.05 over the raw score while losing no more than 0.02 clean image-AUROC. Anything less is recorded as a rejection, as Fix 2b was.
+
+### Fix 2c: what happened
+
+**Rejected.** Same checkpoint, same anomaly maps, scored four ways in one pass ([`results/runs/ae_v3_holdout30.json`](results/runs/ae_v3_holdout30.json)):
+
+| Score | Clean image | Clean pixel | Lighting image | Lighting pixel |
+|---|:---:|:---:|:---:|:---:|
+| raw top-1% | 0.948 | 0.902 | 0.573 | 0.728 |
+| `pixel_z`, matched calibration | 0.958 | 0.869 | **0.569** | 0.650 |
+| `pixel_z_cleancal`, clean calibration | 0.958 | 0.869 | 0.511 | 0.597 |
+
+Lighting image-AUROC moved by −0.004 against a bar of +0.05. The clean-image condition held (+0.010), so the rejection is on the lighting gain alone. Two of the three predictions were wrong: clean pixel-AUROC fell instead of rising, and the calibration did nothing for lighting.
+
+**Discounting the rim cuts both ways, because bottles break at the rim.** The per-defect-type breakdown on clean images splits cleanly:
+
+| Defect type | Pixel-AUROC raw → z | Image-AUROC raw → z | Defect pixels in the top-10% σ zone |
+|---|:---:|:---:|:---:|
+| contamination | 0.847 → **0.963** | 0.914 → **0.976** | 3% |
+| broken_large | 0.927 → 0.800 | 0.995 → 0.970 | 35% |
+| broken_small | 0.971 → 0.894 | 0.936 → 0.930 | 41% |
+
+Contamination sits in the interior, away from the high-variance ring, and per-pixel z does exactly what it was designed to do there. Breakage sits *on* the ring, so dividing out the ring's normal spread divides out the defect too ([`results/figures/fix2c_clean_raw.png`](results/figures/fix2c_clean_raw.png) against [`fix2c_clean_z.png`](results/figures/fix2c_clean_z.png): the z map keeps a thin arc of the break and moves the hot spots off it). Some of what earlier figures read as "rim over-firing" was the defect class that lives at the rim. The README's claim that the rim is pure nuisance was too strong.
+
+**Under lighting, the calibration has nothing to work with.** The per-pixel spread over lighting-stressed normals is about 16 times the clean spread (σ floor 0.260 against 0.017). The lighting variance swamps the per-pixel structure the method relies on, so z is close to a smoothed copy of the raw map. The clean-calibrated variant is worse than raw, as expected: it removes neither the rim nor the frame's brightness.
+
+**A new observation that cuts against the original diagnosis.** In [`results/figures/fix2c_lighting_z.png`](results/figures/fix2c_lighting_z.png), row 3 carries the directional shadow, and its *reconstruction* collapses: the bottle comes back as a smeared blur and the whole outer edge fires. No scoring rule can fix that image, because the map itself is wrong. This is one image, not a measurement, but it suggests part of the lighting failure is in the representation, not only the score. The project's working diagnosis ("score normalisation, not representation") had held up until now on the evidence of a healthy lighting pixel-AUROC. That evidence is an average, and an average can hide a subset of frames where the model fails outright.
+
+What is worth keeping: the held-out split, the calibration code and the `--zmap` figure option, all of which the next experiments can reuse; and the contamination result, which says per-pixel normal statistics are a real gain for interior defects.
+
 ---
 
 ## Architecture
@@ -133,18 +185,19 @@ defectloc/            the pipeline
   config.py           every value that defines a run, logged into each result
   model.py            the autoencoder
   losses.py           0.5·MSE + 0.5·(1 − SSIM)
-  data.py             MVTec-layout datasets
+  data.py             MVTec-layout datasets, seeded calibration hold-out split
   augment.py          the factory-lighting stress test (seeded)
   anomaly.py          local-SSIM map, top-k score, median/MAD normalization
+  calibrate.py        Fix 2c: per-pixel statistics of held-out normal maps, z map
   train.py            training + checkpoint I/O
-  evaluate.py         image/pixel AUROC, both scoring variants, per-defect-type
+  evaluate.py         image/pixel AUROC, every scoring variant, per-defect-type
   visualize.py        input / reconstruction / map / ground-truth figures
 scripts/
   prepare_data.py         fetch MVTec AD, build clean + lighting roots
   make_results_table.py   render results/results.md
   patchcore_baseline.py   re-run the PatchCore reference row (optional, heavy)
   make_synthetic_fixture.py  tiny procedural dataset for smoke tests
-tests/test_smoke.py   14 plumbing and invariant tests, no GPU or dataset needed
+tests/test_smoke.py   19 plumbing and invariant tests, no GPU or dataset needed
 results/              history.json (recorded, with provenance) + generated results.md
 ```
 
@@ -178,7 +231,7 @@ python -m defectloc.evaluate \
     --out results/runs/ae_v3.json
 ```
 
-`evaluate` scores both ways in a single pass over the test set, so the raw and median/MAD numbers are always measured on identical anomaly maps:
+`evaluate` scores every variant in a single pass over the test set, so the raw and median/MAD numbers (and, for a hold-out checkpoint, the two `pixel_z` variants) are always measured on identical anomaly maps:
 
 ```
 clean     [none      ]  image-AUROC 0.xxxx   pixel-AUROC 0.xxxx
@@ -194,7 +247,18 @@ python -m defectloc.visualize --checkpoint checkpoints/ae_v3.pt \
     --data-root data/MVTecAD/bottle --out results/figures/v3_clean.png
 ```
 
-Training runs on GPU if one is visible and falls back to CPU otherwise (`--device` forces either). 80 epochs over 209 images takes a few minutes on a GPU.
+Training runs on GPU if one is visible and falls back to CPU otherwise (`--device` forces either). 80 epochs over 209 images takes a few minutes on a GPU; on a laptop CPU, 80 epochs over 179 images took 19 minutes.
+
+Fix 2c needs a checkpoint trained with held-out normals. `evaluate` then adds the two `pixel_z` variants on its own, and `visualize --zmap` draws the calibrated map:
+
+```bash
+python -m defectloc.train --data-root data/MVTecAD/bottle --calib-holdout 30 \
+    --out checkpoints/ae_v3_holdout30.pt
+
+python -m defectloc.visualize --checkpoint checkpoints/ae_v3_holdout30.pt \
+    --data-root data/MVTecAD_lighting/bottle --train-root data/MVTecAD/bottle \
+    --zmap lighting --out results/figures/fix2c_lighting_z.png
+```
 
 ### Reproducing the table
 
@@ -236,7 +300,7 @@ pip install -r requirements-dev.txt
 pytest tests/ -q
 ```
 
-14 tests, about 10 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
+19 tests, about 15 seconds, no GPU and no dataset. They build a small procedural fixture and run the pipeline end to end. They assert **no accuracy threshold**, because a number measured on procedural rings would mean nothing; accuracy belongs in the results table, measured on MVTec AD.
 
 ### PatchCore baseline (optional)
 
@@ -263,7 +327,8 @@ python scripts/patchcore_baseline.py --data-root data/MVTecAD --category bottle
 
 - [x] **Refactor** the notebook into Python modules.
 - [x] **Fix 2b — per-image median/MAD score normalization.** Measured and **rejected**: image-AUROC fell in both conditions (clean 0.936 → 0.642, lighting 0.551 → 0.451). Kept in the code as an option, and in the table as a recorded negative result. See [Fix 2b: what happened](#fix-2b-what-happened).
-- [ ] **Fix 2c — calibrate the image score against held-out normal images** instead of against the image's own pixels, so the defect cannot inflate its own divisor.
+- [x] **Fix 2c — per-pixel calibration against held-out normal images.** Measured and **rejected**: lighting image-AUROC 0.573 → 0.569 against a pre-registered bar of +0.05. It helps interior contamination (pixel 0.847 → 0.963) and hurts rim breakage (broken_large 0.927 → 0.800). See [Fix 2c: what happened](#fix-2c-what-happened).
+- [ ] **Lighting-augmented training** — train with the photometric transforms (different seed from the test set) so the model learns to reconstruct under them. This is the direct test of the representation half of the diagnosis, which Fix 2c's collapsed shadow frame calls into question. Measure the shadow subset separately.
 - [ ] **Masking-based denoising** — replace additive noise with random patch masking/inpainting to erase defects more completely and reduce false-firing.
 - [ ] **Synthetic defects (DRAEM-style)** — paste defect-shaped corruptions on normal images for self-supervised, mask-supervised training; expected to push past ~0.95 and improve pixel-F1.
 - [ ] **Feature-space reconstruction** — reconstruct pretrained-backbone features instead of raw pixels; historically where reconstruction methods start matching memory-bank methods like PatchCore.

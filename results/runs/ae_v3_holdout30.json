@@ -1,0 +1,247 @@
+{
+  "label": "Autoencoder v3, 179-image train (30 held out)",
+  "checkpoint": "checkpoints/ae_v3_holdout30.pt",
+  "config": {
+    "img_size": 256,
+    "num_workers": 0,
+    "latent_ch": 64,
+    "epochs": 80,
+    "batch_size": 16,
+    "lr": 0.0002,
+    "noise_sigma": 0.1,
+    "loss_alpha": 0.5,
+    "ssim_window": 11,
+    "topk_frac": 0.01,
+    "calib_holdout": 30,
+    "calib_copies": 4,
+    "seed": 0
+  },
+  "train_seconds": 1127.1,
+  "final_train_loss": 0.0665873099457134,
+  "conditions": {
+    "clean": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.9476190476190476,
+          "pixel_AUROC": 0.9025066524286627,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.995,
+              "pixel_AUROC": 0.9272353348126512
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9363636363636363,
+              "pixel_AUROC": 0.970757589912473
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9142857142857143,
+              "pixel_AUROC": 0.8466245771053327
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.6071428571428572,
+          "pixel_AUROC": 0.8734937392056512,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.63,
+              "pixel_AUROC": 0.8993932221407082
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.8181818181818182,
+              "pixel_AUROC": 0.9628281285731367
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.36428571428571427,
+              "pixel_AUROC": 0.7965637424876838
+            }
+          }
+        },
+        "pixel_z": {
+          "image_AUROC": 0.9579365079365079,
+          "pixel_AUROC": 0.86865653033891,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.9700000000000001,
+              "pixel_AUROC": 0.8004284823565365
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9295454545454546,
+              "pixel_AUROC": 0.8944397186025681
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9761904761904763,
+              "pixel_AUROC": 0.962614026162306
+            }
+          }
+        },
+        "pixel_z_cleancal": {
+          "image_AUROC": 0.9579365079365079,
+          "pixel_AUROC": 0.86865653033891,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.9700000000000001,
+              "pixel_AUROC": 0.8004284823565365
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.9295454545454546,
+              "pixel_AUROC": 0.8944397186025681
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.9761904761904763,
+              "pixel_AUROC": 0.962614026162306
+            }
+          }
+        }
+      },
+      "root": "data/MVTecAD/bottle"
+    },
+    "lighting": {
+      "n_images": 83,
+      "n_defective": 63,
+      "variants": {
+        "none": {
+          "image_AUROC": 0.5734126984126984,
+          "pixel_AUROC": 0.728285970861511,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.5775,
+              "pixel_AUROC": 0.7830224441598693
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5363636363636364,
+              "pixel_AUROC": 0.8404211089204554
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.6083333333333334,
+              "pixel_AUROC": 0.6264859118595327
+            }
+          }
+        },
+        "median_mad": {
+          "image_AUROC": 0.4706349206349206,
+          "pixel_AUROC": 0.7260931184912757,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.51,
+              "pixel_AUROC": 0.7915490874299891
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5454545454545454,
+              "pixel_AUROC": 0.799415612001912
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.3547619047619048,
+              "pixel_AUROC": 0.6002283131479498
+            }
+          }
+        },
+        "pixel_z": {
+          "image_AUROC": 0.569047619047619,
+          "pixel_AUROC": 0.650154036523729,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.5825,
+              "pixel_AUROC": 0.6814557949593674
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.5340909090909091,
+              "pixel_AUROC": 0.7814253660496988
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.5928571428571429,
+              "pixel_AUROC": 0.5740443809492922
+            }
+          }
+        },
+        "pixel_z_cleancal": {
+          "image_AUROC": 0.5111111111111111,
+          "pixel_AUROC": 0.5966912863081882,
+          "per_defect_type": {
+            "broken_large": {
+              "n": 20,
+              "image_AUROC": 0.49,
+              "pixel_AUROC": 0.5206571428468338
+            },
+            "broken_small": {
+              "n": 22,
+              "image_AUROC": 0.4636363636363637,
+              "pixel_AUROC": 0.5791727430812892
+            },
+            "contamination": {
+              "n": 21,
+              "image_AUROC": 0.5809523809523809,
+              "pixel_AUROC": 0.7230878669629588
+            }
+          }
+        }
+      },
+      "root": "data/MVTecAD_lighting/bottle"
+    }
+  },
+  "calibration": {
+    "holdout_files": [
+      "000.png",
+      "006.png",
+      "017.png",
+      "025.png",
+      "041.png",
+      "054.png",
+      "060.png",
+      "065.png",
+      "068.png",
+      "071.png",
+      "080.png",
+      "083.png",
+      "090.png",
+      "091.png",
+      "094.png",
+      "105.png",
+      "112.png",
+      "116.png",
+      "141.png",
+      "152.png",
+      "159.png",
+      "162.png",
+      "163.png",
+      "164.png",
+      "175.png",
+      "178.png",
+      "194.png",
+      "195.png",
+      "200.png",
+      "206.png"
+    ],
+    "clean": {
+      "n_maps": 30,
+      "sigma_floor": 0.016544915735721588
+    },
+    "lighting": {
+      "n_maps": 120,
+      "sigma_floor": 0.25964605808258057
+    }
+  }
+}

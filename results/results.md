@@ -14,6 +14,9 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 | Autoencoder v3 - local-SSIM anomaly map | 0.937 | **0.894** | 0.512 | 0.715 | kaggle-notebook |
 | Autoencoder v3 - re-run after the module refactor | 0.936 | **0.908** | 0.551 | 0.720 | kaggle-run-v2 |
 | Autoencoder v3 + median/MAD image score (REJECTED) | 0.642 | 0.885 | 0.451 | 0.728 | kaggle-run-v2 |
+| Autoencoder v3 - 179-image train, 30 held out | 0.948 | **0.902** | 0.573 | 0.728 | local-run |
+| Autoencoder v3 + per-pixel z, matched calibration (REJECTED) | 0.958 | 0.869 | 0.569 | 0.650 | local-run |
+| Autoencoder v3 + per-pixel z, clean calibration (REJECTED) | 0.958 | 0.869 | 0.511 | 0.597 | local-run |
 
 ## Provenance
 
@@ -26,9 +29,15 @@ A photometric "factory-lighting" stress test (brightness / contrast / gamma / co
 - **Autoencoder v3 - local-SSIM anomaly map** — defect_detection_log.md sec. v3, confirmed by the surviving output of notebook cell 17 (0.9373 / 0.8942 clean, 0.5123 / 0.7150 lighting).
   - +15 pixel-AUROC points with no retraining. Lighting image-AUROC at chance is the open bug Fix 2b tried to close.
 - **Autoencoder v3 - re-run after the module refactor** — results/runs/ae_v3_kaggle.json. Fresh 80-epoch training run, seed 0, on Kaggle (CPU: the assigned Tesla P100 is sm_60 and the preinstalled torch supports sm_70+, so the device probe fell back). 1931 s, final loss 0.0643.
-  - Reproduces the notebook within run-to-run spread (0.937/0.894 -> 0.937/0.908 clean; 0.512/0.715 -> 0.551/0.720 lighting), which is the evidence that the refactor preserved the numerics.
+  - Reproduces the notebook within run-to-run spread (0.937/0.894 -> 0.937/0.908 clean; 0.512/0.715 -> 0.551/0.720 lighting), which is the evidence that the refactor preserved the numerics. Re-evaluated locally on 2026-10-26 (results/runs/ae_v3_local_repro.json, MVTec bottle fetched file by file from Kaggle, lighting set rebuilt with seed 0): 0.937/0.908 clean, 0.555/0.721 lighting, so the local data and the generalised evaluator reproduce it.
 - **Autoencoder v3 + median/MAD image score (REJECTED)** — results/runs/ae_v3_kaggle.json, same checkpoint and same anomaly maps as the row above, scored differently in the same pass.
   - Fix 2b failed. Image-AUROC fell in BOTH conditions: clean 0.937 -> 0.642, lighting 0.551 -> 0.451 (below chance). Dividing by each image's own MAD removes a signal that was real, because an image that reconstructs badly overall is genuinely more likely to be defective, and MAD itself rises with the defect. See README 'Fix 2b: what happened'.
+- **Autoencoder v3 - 179-image train, 30 held out** — results/runs/ae_v3_holdout30.json. Fresh 80-epoch run, seed 0, on 179 of the 209 train images (30 held out for calibration, recorded in the checkpoint), local CPU, 1127 s.
+  - Baseline for Fix 2c: the raw score on the checkpoint the calibration needs. Its own median/MAD score is consistent with Fix 2b's rejection (clean 0.607, lighting 0.471).
+- **Autoencoder v3 + per-pixel z, matched calibration (REJECTED)** — Same run, same anomaly maps as the row above. Clean images against clean held-out normals; lighting images against held-out normals stressed with lighting seed 1 (4 copies each).
+  - Fix 2c failed its pre-registered bar (lighting image-AUROC +0.05, clean loss <= 0.02): lighting image-AUROC 0.573 -> 0.569. Clean image-AUROC rose 0.948 -> 0.958, but clean pixel-AUROC fell 0.902 -> 0.869: discounting the rim helps contamination (pixel 0.847 -> 0.963) and hurts breakage (broken_large 0.927 -> 0.800), because bottles break at the rim. See README 'Fix 2c: what happened'.
+- **Autoencoder v3 + per-pixel z, clean calibration (REJECTED)** — Same run, same anomaly maps. Lighting images scored against the CLEAN held-out statistics.
+  - The stricter variant, which assumes nothing about the lighting: worse than raw under lighting (image 0.573 -> 0.511, pixel 0.728 -> 0.597). Clean columns equal the row above by construction.
 
 ## How to read the two conditions
 

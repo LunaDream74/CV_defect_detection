@@ -35,6 +35,10 @@ class Config:
     ssim_window: int = 11         # local-SSIM dissimilarity map (v3 fix)
     topk_frac: float = 0.01       # image score = mean of hottest 1% of pixels
 
+    # --- Fix 2c: per-pixel calibration on held-out normals ---
+    calib_holdout: int = 0        # train/good images withheld from training (0 = none)
+    calib_copies: int = 4         # lighting-stressed copies of each held-out image
+
     # --- reproducibility ---
     seed: int = 0
 

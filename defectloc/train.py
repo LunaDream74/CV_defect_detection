@@ -75,7 +75,7 @@ def train(root, cfg: Config, device: torch.device, log_every: int = 10, verbose:
     """Train on ``<root>/train/good`` and return (model, history)."""
     set_seed(cfg.seed)
 
-    ds = TrainGood(root, img_size=cfg.img_size)
+    ds = TrainGood(root, img_size=cfg.img_size, holdout=cfg.calib_holdout, seed=cfg.seed)
     loader = DataLoader(
         ds,
         batch_size=cfg.batch_size,
@@ -148,6 +148,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--latent-ch", type=int, default=d.latent_ch)
     p.add_argument("--noise-sigma", type=float, default=d.noise_sigma)
     p.add_argument("--seed", type=int, default=d.seed)
+    p.add_argument("--calib-holdout", type=int, default=d.calib_holdout,
+                   help="withhold N train/good images for Fix 2c calibration")
     p.add_argument("--num-workers", type=int, default=d.num_workers)
     p.add_argument("--log-every", type=int, default=10, help="print loss every N epochs")
     p.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
@@ -165,6 +167,7 @@ def main(argv=None) -> int:
         lr=args.lr,
         noise_sigma=args.noise_sigma,
         seed=args.seed,
+        calib_holdout=args.calib_holdout,
     )
     device = pick_device(args.device)
     print(f"device: {device}  |  config: {json.dumps(cfg.to_dict())}", flush=True)
@@ -173,10 +176,13 @@ def main(argv=None) -> int:
     model, history = train(args.data_root, cfg, device, log_every=args.log_every)
     elapsed = time.time() - t0
 
+    held = TrainGood(args.data_root, cfg.img_size, cfg.calib_holdout, cfg.seed, part="holdout")
     out = save_checkpoint(
         args.out, model, cfg, history,
         extra={"data_root": str(args.data_root), "train_seconds": round(elapsed, 1),
-               "device": str(device)},
+               "device": str(device),
+               # Recorded so evaluate can check it re-derives the same split.
+               "calib_holdout_files": [p.name for p in held.paths]},
     )
     print(f"\ntrained in {elapsed:.1f}s  ->  {out}")
     return 0
